@@ -57,6 +57,11 @@ func (e *Editor) Load() (*Config, error) {
 func (e *Editor) Save(cfg *Config) error {
 	p := Path()
 
+	// Ensure parent dir exists so callers don't have to (mirrors settings.Save).
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+
 	// Read existing raw to merge unknown fields
 	existing := map[string]json.RawMessage{}
 	if data, err := os.ReadFile(p); err == nil {

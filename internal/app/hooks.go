@@ -1,11 +1,6 @@
 package app
 
-import (
-	"os"
-	"path/filepath"
-
-	"github.com/akke/ease-ui/internal/hooks"
-)
+import "github.com/akke/ease-ui/internal/hooks"
 
 // HooksConfig is the frontend-facing shape (no need to expose internal types).
 type HooksConfig struct {
@@ -32,10 +27,6 @@ func (a *App) GetHooksConfig() (*HooksConfig, error) {
 
 func (a *App) SaveHooksConfig(hc *HooksConfig) error {
 	cfg := fromHooksConfig(hc)
-	// Ensure parent dir exists; hooks.Editor.Save does not create it.
-	if err := os.MkdirAll(filepath.Dir(hooks.Path()), 0o755); err != nil {
-		return err
-	}
 	return hooks.NewEditor().Save(cfg)
 }
 
