@@ -4,6 +4,7 @@ import { IsInitialized, Verify, LockoutState } from '../composables/useWails'
 
 export const useAuthStore = defineStore('auth', () => {
   const initialized = ref(false)
+  const loggedIn = ref(false)
   const attempts = ref(0)
   const lockedUntil = ref<Date | null>(null)
 
@@ -16,6 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
       await Verify(password)
       attempts.value = 0
       lockedUntil.value = null
+      loggedIn.value = true
       return null
     } catch (e: any) {
       // Reload lockout state to learn if we are now locked
@@ -26,5 +28,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { initialized, attempts, lockedUntil, checkInit, login }
+  return { initialized, loggedIn, attempts, lockedUntil, checkInit, login }
 })
