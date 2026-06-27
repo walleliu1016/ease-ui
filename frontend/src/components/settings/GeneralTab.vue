@@ -9,7 +9,7 @@
 
     <div class="row">
       <label class="k">Claude CLI 路径</label>
-      <input class="v" v-model="cfg.claude_path" placeholder="留空用 PATH 中的 claude" />
+      <input class="v" v-model="cfg.claude_path" @change="markDirty" placeholder="留空用 PATH 中的 claude" />
     </div>
 
     <div class="row toggle">
@@ -36,7 +36,7 @@
 
     <div class="row">
       <label class="k">自动锁定</label>
-      <select class="v" v-model.number="cfg.auto_lock_minutes">
+      <select class="v" v-model.number="cfg.auto_lock_minutes" @change="markDirty">
         <option :value="1">1 分钟</option>
         <option :value="5">5 分钟</option>
         <option :value="10">10 分钟</option>
