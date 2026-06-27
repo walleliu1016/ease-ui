@@ -17,5 +17,8 @@ func main() {
 		}
 		return
 	}
-	fmt.Println("ease-ui", version, "(GUI launch handled by wails build)")
+	if err := runApp(); err != nil {
+		fmt.Fprintln(os.Stderr, "ease-ui:", err)
+		os.Exit(1)
+	}
 }
