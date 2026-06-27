@@ -11,18 +11,6 @@ import (
 	"github.com/akke/ease-ui/internal/session"
 )
 
-type SessionView struct {
-	ID      string `json:"id"`
-	WorkDir string `json:"workdir"`
-	State   string `json:"state"`
-}
-
-type AppSession struct {
-	ID      string
-	WorkDir string
-	State   string
-}
-
 func (a *App) SetClaudeBinary(p string) {
 	a.mu().Lock()
 	defer a.mu().Unlock()
@@ -44,8 +32,8 @@ func (a *App) CreateSession(workDir, _prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bin := a.claudeBin
 	a.mu().RLock()
+	bin := a.claudeBin
 	if bin == "" {
 		bin = a.settings.ClaudePath
 	}
