@@ -9,7 +9,7 @@ var version = "dev"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "init" {
-		// CLI init handled in Task 21
+		// CLI init handled in Task 23
 		fmt.Println("init placeholder")
 		return
 	}
