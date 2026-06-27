@@ -17,12 +17,12 @@
 
     <div class="row">
       <label class="k">服务地址</label>
-      <input class="v" v-model="cfg.cloud_service_url" :disabled="!cfg.cloud_service_enabled" placeholder="https://ease.example.com" />
+      <input class="v" v-model="cfg.cloud_service_url" @change="markDirty" :disabled="!cfg.cloud_service_enabled" placeholder="https://ease.example.com" />
     </div>
 
     <div class="row">
       <label class="k">鉴权 Token</label>
-      <input class="v" type="password" v-model="cfg.cloud_service_token" :disabled="!cfg.cloud_service_enabled" />
+      <input class="v" type="password" v-model="cfg.cloud_service_token" @change="markDirty" :disabled="!cfg.cloud_service_enabled" />
     </div>
 
     <div class="row">
@@ -47,7 +47,18 @@ import { onMounted, computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 
 const settings = useSettingsStore()
-const cfg = computed(() => settings.cfg as any)
+const cfg = computed(() => settings.cfg ?? (settings.cfg = {
+  theme: 'dark-pro',
+  claude_path: '',
+  auto_allow_bash: false,
+  log_enabled: false,
+  auto_lock_minutes: 5,
+  auto_start: false,
+  minimize_on_start: false,
+  cloud_service_enabled: false,
+  cloud_service_url: '',
+  cloud_service_token: '',
+} as any))
 
 onMounted(() => settings.load())
 function markDirty() { settings.markDirty() }
