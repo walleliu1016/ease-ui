@@ -28,6 +28,8 @@ export function OSUsername():Promise<string>;
 
 export function OpenInTerminal(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function PickDirectory():Promise<string>;
+
 export function RespondPermission(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SaveHooksConfig(arg1:app.HooksConfig):Promise<void>;

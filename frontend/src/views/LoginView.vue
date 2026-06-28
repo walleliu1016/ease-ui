@@ -125,7 +125,7 @@ function onClose()    { WindowQuit() }
 .login { display: flex; flex-direction: column; height: 100vh; }
 .login-body {
   flex: 1;
-  background: radial-gradient(ellipse at top, #1a1230 0%, var(--bg-primary) 70%);
+  background: radial-gradient(ellipse at top, var(--bg-input) 0%, var(--bg-primary) 70%);
   padding: 28px 32px 22px;
   display: flex; flex-direction: column;
 }

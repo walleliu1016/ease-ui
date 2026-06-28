@@ -2,8 +2,9 @@
   <div class="general-tab">
     <div class="row">
       <label class="k">主题</label>
-      <select class="v" v-model="cfg.theme" @change="markDirty">
+      <select class="v" v-model="cfg.theme" @change="onThemeChange">
         <option value="dark-pro">深色专业</option>
+        <option value="light-pro">浅色专业</option>
       </select>
     </div>
 
@@ -96,6 +97,16 @@ const cfg = computed(() => settings.cfg ?? (settings.cfg = {
 
 onMounted(() => settings.load())
 function markDirty() { settings.markDirty() }
+
+function onThemeChange() {
+  markDirty()
+  // 即时预览主题切换
+  const theme = cfg.value?.theme
+  if (theme) {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('ease-ui-theme', theme)
+  }
+}
 
 async function onSave() {
   try { await settings.save() }

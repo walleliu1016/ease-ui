@@ -19,8 +19,8 @@ defineEmits<{ (e: 'settings'): void }>()
 <style scoped>
 .userbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px; border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 0 12px; border-top: 1px solid var(--border);
+  flex-shrink: 0; height: 46px;
 }
 .user { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .avatar { font-size: 18px; }

@@ -70,15 +70,15 @@ const html = computed(() => {
 }
 .markdown-body :deep(th) { background: var(--bg-input); }
 .markdown-body :deep(pre) {
-  background: #1e1e2e; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 10px 12px; margin: 8px 0; overflow-x: auto; font-size: 11px; line-height: 1.5;
 }
 .markdown-body :deep(code) {
   background: var(--bg-input); padding: 1px 5px; border-radius: 3px;
-  font-size: 11px; font-family: var(--font-mono);
+  font-size: 11px; font-family: var(--font-mono); color: var(--accent-light);
 }
 .markdown-body :deep(pre code) {
-  background: transparent; padding: 0; color: #aed581;
+  background: transparent; padding: 0; color: var(--text-primary);
 }
 .markdown-body :deep(hr) { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
 .markdown-body :deep(strong) { font-weight: 600; }
@@ -86,9 +86,9 @@ const html = computed(() => {
 
 .text { color: var(--text-primary); word-wrap: break-word; }
 .code {
-  background: #1e1e2e; border: 1px solid var(--border);
+  background: var(--bg-primary); border: 1px solid var(--border);
   border-radius: var(--radius-md); padding: 8px 10px;
-  font-size: var(--font-size-code); color: #aed581;
+  font-size: var(--font-size-code); color: var(--text-primary);
   overflow-x: auto;
 }
 </style>

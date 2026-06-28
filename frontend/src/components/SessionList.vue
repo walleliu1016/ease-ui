@@ -2,7 +2,7 @@
   <div class="session-list">
     <div class="header">
       <span class="label">会话</span>
-      <button class="add" @click="$emit('create')" title="新建会话">+</button>
+      <button class="add" @click="$emit('create')">+ 新建</button>
     </div>
     <div class="items">
       <SessionItem
@@ -50,17 +50,16 @@ function projectName(s: SessionMeta): string {
 .session-list { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px; border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 0 12px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; height: 38px;
 }
 .label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
 .add {
-  width: 22px; height: 22px; border-radius: var(--radius-md);
-  background: var(--bg-input); color: var(--accent-light);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--radius-md);
+  background: var(--accent); color: white;
+  font-size: 11px; font-weight: 500;
 }
-.add:hover { background: var(--accent); color: white; }
+.add:hover { background: var(--accent-deep); }
 .items { flex: 1; overflow-y: auto; padding: 6px; min-height: 0; }
 .empty { color: var(--text-tertiary); font-size: 11px; text-align: center; padding: 20px; }
 </style>

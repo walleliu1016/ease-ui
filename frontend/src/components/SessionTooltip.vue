@@ -64,7 +64,7 @@ const formatSize = computed(() => {
   min-width: 320px;
   max-width: 400px;
   z-index: 1000;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-window);
 }
 .section { margin-bottom: 8px; }
 .section:last-child { margin-bottom: 0; }

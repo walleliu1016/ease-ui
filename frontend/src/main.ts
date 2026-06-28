@@ -6,6 +6,10 @@ import router from './router'
 import './styles/reset.css'
 import './styles/theme.css'
 
+// 启动时应用保存的主题，避免闪烁
+const saved = localStorage.getItem('ease-ui-theme')
+if (saved) document.documentElement.setAttribute('data-theme', saved)
+
 const app = createApp(App)
 app.config.errorHandler = (err, _instance, info) => {
   console.error('[ease-ui] Vue error:', info, err)

@@ -15,7 +15,6 @@
             :path="sessions.active.workdir"
             :session-id="sessions.active.id"
             :msg-count="sessions.active.msg_count"
-            :size="sessions.active.size"
             :state="state"
             @open-terminal="openTerminal"
           />

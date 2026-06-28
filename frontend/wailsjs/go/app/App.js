@@ -46,6 +46,10 @@ export function OpenInTerminal(arg1, arg2, arg3) {
   return window['go']['app']['App']['OpenInTerminal'](arg1, arg2, arg3);
 }
 
+export function PickDirectory() {
+  return window['go']['app']['App']['PickDirectory']();
+}
+
 export function RespondPermission(arg1, arg2, arg3) {
   return window['go']['app']['App']['RespondPermission'](arg1, arg2, arg3);
 }
