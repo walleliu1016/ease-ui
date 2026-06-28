@@ -17,6 +17,7 @@ type SessionMeta struct {
 	MTime       int64  `json:"mtime"`
 	MsgCount    int    `json:"msg_count"`
 	FirstPrompt string `json:"first_prompt"`
+	AITitle     string `json:"ai_title"`
 	Size        int64  `json:"size"`
 }
 
@@ -72,13 +73,14 @@ func ScanAll() ([]SessionMeta, error) {
 				continue
 			}
 			id := strings.TrimSuffix(f.Name(), ".jsonl")
-			fp, mc := scanFileMeta(filepath.Join(projDir, f.Name()))
+			fp, at, mc := scanFileMeta(filepath.Join(projDir, f.Name()))
 			metas = append(metas, SessionMeta{
 				ID:          id,
 				WorkDir:     workDir,
 				MTime:       info.ModTime().Unix(),
 				MsgCount:    mc,
 				FirstPrompt: fp,
+				AITitle:     at,
 				Size:        info.Size(),
 			})
 		}
@@ -99,47 +101,54 @@ func decodeProjectDirName(name string) string {
 	return "/" + strings.Join(parts, "/")
 }
 
-// scanFileMeta reads a jsonl file and returns its first user prompt
-// and total line count. Returns empty strings / zero on any error.
-func scanFileMeta(path string) (firstPrompt string, msgCount int) {
+// scanFileMeta reads a jsonl file and returns its first user prompt,
+// ai_title (if any), and total line count.
+func scanFileMeta(path string) (firstPrompt, aiTitle string, msgCount int) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", 0
+		return "", "", 0
 	}
 	defer f.Close()
 
 	type rawLine struct {
 		Type    string          `json:"type"`
 		Message json.RawMessage `json:"message"`
-	}
-	type msg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
+		AITitle string          `json:"ai_title"`
 	}
 
 	var count int
-	var found bool
+	var foundUser bool
+	var foundTitle bool
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 	for scanner.Scan() {
 		count++
-		if found {
+		if foundUser && foundTitle {
 			continue
 		}
 		var rl rawLine
 		if json.Unmarshal(scanner.Bytes(), &rl) != nil {
 			continue
 		}
-		var m msg
-		if json.Unmarshal(rl.Message, &m) != nil {
-			continue
+		if !foundTitle && rl.AITitle != "" {
+			aiTitle = rl.AITitle
+			foundTitle = true
 		}
-		if m.Role == "user" && m.Content != "" {
-			firstPrompt = m.Content
-			found = true
+		if !foundUser {
+			var m Message
+			if json.Unmarshal(rl.Message, &m) != nil {
+				continue
+			}
+			if m.Role == "user" {
+				t := m.ContentText()
+				if t != "" {
+					firstPrompt = t
+					foundUser = true
+				}
+			}
 		}
 	}
-	return firstPrompt, count
+	return firstPrompt, aiTitle, count
 }
 
 // Watch creates a fsnotify watcher for the given session jsonl.

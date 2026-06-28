@@ -6,6 +6,7 @@ export interface SessionMeta {
   mtime: number
   msg_count: number
   first_prompt: string
+  ai_title: string
   size: number
 }
 

@@ -18,7 +18,7 @@ func TestParseFile_BasicLines(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, msgs, 2)
 	assert.Equal(t, "user", msgs[0].Role)
-	assert.Equal(t, "hi", msgs[0].Content)
+	assert.Equal(t, "hi", msgs[0].ContentText())
 }
 
 func TestParseFile_SkipsBadLines(t *testing.T) {

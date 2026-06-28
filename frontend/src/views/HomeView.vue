@@ -11,12 +11,16 @@
         <template v-if="sessions.active">
           <ToolBar
             :title="displayName"
+            :ai-title="sessions.active?.ai_title"
             :path="sessions.active.workdir"
+            :session-id="sessions.active.id"
+            :msg-count="sessions.active.msg_count"
+            :size="sessions.active.size"
             :state="state"
             @open-terminal="openTerminal"
           />
           <div class="messages" ref="msgContainer">
-            <MessageBubble v-for="m in messages" :key="m.id" :role="m.role" :content="m.content" />
+            <MessageBubble v-for="m in messages" :key="m.id" :role="m.role" :content="m.content" :ts="m.ts" />
             <ToolUseBlock v-for="(t, i) in toolBlocks" :key="i" :name="t.name" :args="t.args" />
             <PermissionPanel v-if="pending" :tool="pending.tool" :args="pending.args" @respond="respondPermission" />
             <div v-if="isStreaming" class="streaming">

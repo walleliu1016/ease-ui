@@ -9,6 +9,30 @@ export interface PendingPerm {
   reqId: string
 }
 
+// 解析 Claude API content block，提取文本拼成 markdown。
+// raw 可能是 plain string，也可能是 content-block 数组。
+function formatContent(raw: any): string {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((b: any) => {
+        if (b.type === 'text' && b.text) return b.text
+        if (b.type === 'thinking' && b.thinking) return `> ${b.thinking}`
+        if (b.type === 'tool_use') return `> 🔧 **${b.name}**`
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n\n')
+  }
+  if (typeof raw === 'string') {
+    try {
+      const blocks = JSON.parse(raw)
+      if (Array.isArray(blocks)) return formatContent(blocks)
+    } catch {}
+    return raw
+  }
+  return String(raw || '')
+}
+
 export const useSessionsStore = defineStore('sessions', () => {
   const list = ref<SessionMeta[]>([])
   const activeId = ref<string | null>(null)
@@ -47,7 +71,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         [sid]: (raw || []).map((m: any, i: number) => ({
           id: `${sid}-${i}`,
           role: m.role || m.Role || 'assistant',
-          content: m.content || m.Content || '',
+          content: formatContent(m.content || m.Content || ''),
           ts: Date.now() - ((raw || []).length - i) * 1000,
         })),
       }

@@ -1,10 +1,37 @@
 <template>
-  <div class="tip">
-    <div class="row"><span class="k">Session ID</span><span class="v mono">{{ meta.id }}</span></div>
-    <div class="row"><span class="k">工作目录</span><span class="v">{{ meta.workdir }}</span></div>
-    <div class="row"><span class="k">修改时间</span><span class="v">{{ formatTime }}</span></div>
-    <div class="row"><span class="k">消息数</span><span class="v">{{ meta.msg_count }}</span></div>
-    <div class="row"><span class="k">文件大小</span><span class="v">{{ formatSize }}</span></div>
+  <div class="tip" :style="{ left: anchor.x + 'px', top: anchor.y + 'px' }" @mouseenter="$emit('mouseenter')" @mouseleave="$emit('mouseleave')">
+    <div class="section">
+      <div class="label">Session ID</div>
+      <div class="mono-value">{{ meta.id }}</div>
+    </div>
+    <div class="section">
+      <div class="label">工作目录</div>
+      <div class="value">{{ meta.workdir }}</div>
+    </div>
+    <div class="divider" />
+    <div class="section" v-if="meta.ai_title">
+      <div class="label">AI 标题</div>
+      <div class="value">{{ meta.ai_title }}</div>
+    </div>
+    <div class="section">
+      <div class="label">首条提示</div>
+      <div class="value">{{ meta.first_prompt?.slice(0, 80) || '-' }}{{ (meta.first_prompt?.length || 0) > 80 ? '…' : '' }}</div>
+    </div>
+    <div class="divider" />
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-v">{{ meta.msg_count }}</span>
+        <span class="stat-k">消息</span>
+      </div>
+      <div class="stat">
+        <span class="stat-v">{{ formatSize }}</span>
+        <span class="stat-k">大小</span>
+      </div>
+      <div class="stat">
+        <span class="stat-v">{{ formatDate }}</span>
+        <span class="stat-k">创建</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -12,10 +39,12 @@
 import { computed } from 'vue'
 import type { SessionMeta } from '../types/session'
 
-const props = defineProps<{ meta: SessionMeta }>()
+const props = defineProps<{ meta: SessionMeta; anchor: { x: number; y: number } }>()
+defineEmits<{ (e: 'mouseenter'): void; (e: 'mouseleave'): void }>()
 
-const formatTime = computed(() => {
-  return new Date(props.meta.mtime * 1000).toLocaleString('zh-CN', { hour12: false })
+const formatDate = computed(() => {
+  const d = new Date(props.meta.mtime * 1000)
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 })
 const formatSize = computed(() => {
   const s = props.meta.size
@@ -27,14 +56,39 @@ const formatSize = computed(() => {
 
 <style scoped>
 .tip {
-  position: absolute; left: calc(100% + 8px); top: 0;
-  background: var(--bg-panel); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 10px 12px;
-  min-width: 280px; z-index: 100;
-  box-shadow: var(--shadow-window);
+  position: fixed;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  min-width: 320px;
+  max-width: 400px;
+  z-index: 1000;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
 }
-.row { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; padding: 2px 0; }
-.k { color: var(--text-tertiary); }
-.v { color: var(--text-primary); text-align: right; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mono { font-family: var(--font-mono); font-size: 10px; }
+.section { margin-bottom: 8px; }
+.section:last-child { margin-bottom: 0; }
+.label {
+  font-size: 9px; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 2px;
+}
+.value {
+  font-size: 11px; color: var(--text-primary);
+  line-height: 1.4; word-break: break-all;
+}
+.mono-value {
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--accent-light); word-break: break-all; line-height: 1.4;
+}
+.divider {
+  border-top: 1px solid var(--border); margin: 10px 0;
+}
+.stats {
+  display: flex; gap: 16px;
+}
+.stat {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.stat-v { font-size: 12px; color: var(--text-primary); font-weight: 500; }
+.stat-k { font-size: 9px; color: var(--text-tertiary); }
 </style>

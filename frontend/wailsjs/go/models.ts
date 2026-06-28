@@ -61,7 +61,7 @@ export namespace jsonl {
 	
 	export class Message {
 	    role: string;
-	    content: string;
+	    content: number[];
 	    type: string;
 	
 	    static createFrom(source: any = {}) {
@@ -81,6 +81,7 @@ export namespace jsonl {
 	    mtime: number;
 	    msg_count: number;
 	    first_prompt: string;
+	    ai_title: string;
 	    size: number;
 	
 	    static createFrom(source: any = {}) {
@@ -94,6 +95,7 @@ export namespace jsonl {
 	        this.mtime = source["mtime"];
 	        this.msg_count = source["msg_count"];
 	        this.first_prompt = source["first_prompt"];
+	        this.ai_title = source["ai_title"];
 	        this.size = source["size"];
 	    }
 	}

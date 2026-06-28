@@ -10,6 +10,7 @@
         :key="s.id"
         :meta="s"
         :is-active="s.id === activeId"
+        :dup="dupProjects.has(projectName(s))"
         @select="$emit('select', s.id)"
       />
       <div v-if="!list.length" class="empty">暂无会话</div>
@@ -18,14 +19,31 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import SessionItem from './SessionItem.vue'
 import type { SessionMeta } from '../types/session'
 
-defineProps<{ list: SessionMeta[]; activeId: string | null }>()
+const props = defineProps<{ list: SessionMeta[]; activeId: string | null }>()
 defineEmits<{
   (e: 'create'): void
   (e: 'select', id: string): void
 }>()
+
+// 同名 project 检测，用于 SessionItem 显示前缀区分
+const dupProjects = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const s of props.list) {
+    const name = projectName(s)
+    counts[name] = (counts[name] || 0) + 1
+  }
+  return new Set(Object.keys(counts).filter((k) => counts[k] > 1))
+})
+
+function projectName(s: SessionMeta): string {
+  const wd = s.workdir
+  if (!wd || wd === '/') return wd
+  return wd.split('/').filter(Boolean).pop() || wd
+}
 </script>
 
 <style scoped>
