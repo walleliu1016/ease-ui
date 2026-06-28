@@ -19,6 +19,18 @@ type HookEvent struct {
 	Tool      string `json:"tool"`      // tool name (for tool hooks)
 }
 
+// SendRequest is the payload for POST /api/send.
+type SendRequest struct {
+	SessionID string `json:"session_id"`
+	Prompt    string `json:"prompt"`
+}
+
+// SendResult is returned by POST /api/send.
+type SendResult struct {
+	OK    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+}
+
 // Server is the local hook receiver.
 type Server struct {
 	port     int
@@ -26,6 +38,7 @@ type Server struct {
 	lastSeen map[string]time.Time
 	listener net.Listener
 	onEvent  func(HookEvent)
+	onSend   func(SendRequest) error
 }
 
 // New creates a new hook server.
@@ -43,7 +56,8 @@ func (s *Server) Start() (int, error) {
 	s.port = l.Addr().(*net.TCPAddr).Port
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/hook", s.handle)
+	mux.HandleFunc("/hook", s.handleHook)
+	mux.HandleFunc("/api/send", s.handleSend)
 	go http.Serve(l, mux)
 	return s.port, nil
 }
@@ -54,6 +68,9 @@ func (s *Server) Port() int { return s.port }
 // OnEvent registers a callback invoked on every hook event.
 func (s *Server) OnEvent(fn func(HookEvent)) { s.onEvent = fn }
 
+// OnSend registers a callback for POST /api/send. Returns error if write fails.
+func (s *Server) OnSend(fn func(SendRequest) error) { s.onSend = fn }
+
 // LastSeen returns the most recent hook time for a session, or zero.
 func (s *Server) LastSeen(sessionID string) time.Time {
 	s.mu.RLock()
@@ -61,7 +78,7 @@ func (s *Server) LastSeen(sessionID string) time.Time {
 	return s.lastSeen[sessionID]
 }
 
-func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -95,4 +112,37 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// handleSend 接收外部 HTTP 写入 prompt，转发到对应 session 的 claude stdin。
+// POST /api/send  body: {"session_id":"...","prompt":"..."}
+func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.onSend == nil {
+		writeJSON(w, http.StatusServiceUnavailable, SendResult{OK: false, Error: "send handler not registered"})
+		return
+	}
+	var req SendRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, SendResult{OK: false, Error: "bad request: " + err.Error()})
+		return
+	}
+	if req.SessionID == "" || req.Prompt == "" {
+		writeJSON(w, http.StatusBadRequest, SendResult{OK: false, Error: "session_id and prompt required"})
+		return
+	}
+	if err := s.onSend(req); err != nil {
+		writeJSON(w, http.StatusInternalServerError, SendResult{OK: false, Error: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, SendResult{OK: true})
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }

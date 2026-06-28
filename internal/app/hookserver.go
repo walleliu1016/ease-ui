@@ -27,6 +27,11 @@ func (a *App) EnsureHookServer() {
 	}
 	a.hookPort = port
 
+	// POST /api/send → 写入对应 session 的 claude stdin
+	a.hookSrv.OnSend(func(req hookserver.SendRequest) error {
+		return a.SendMessage(req.SessionID, req.Prompt)
+	})
+
 	// 收到 hook 事件 → 通知前端 + 持久化到 instance.json
 	a.hookSrv.OnEvent(func(evt hookserver.HookEvent) {
 		if a.ctx != nil && evt.SessionID != "" {
