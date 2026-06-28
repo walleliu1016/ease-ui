@@ -49,6 +49,14 @@ func (s *Store) Get(sessionID string) State {
 	return s.data[sessionID]
 }
 
+// Delete 从持久化中移除指定会话。
+func (s *Store) Delete(sessionID string) {
+	s.mu.Lock()
+	delete(s.data, sessionID)
+	s.mu.Unlock()
+	_ = s.write()
+}
+
 // Put 更新状态并写入文件。
 func (s *Store) Put(sessionID string, state string) {
 	s.mu.Lock()

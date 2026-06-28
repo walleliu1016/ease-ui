@@ -1,8 +1,6 @@
 package app
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -64,24 +62,64 @@ func (a *App) GetSessionStates() map[string]string {
 	return out
 }
 
-// CreateSession launches a new claude subprocess for the given workdir + prompt.
-// 修复：之前 _prompt 被忽略，导致用户新建 session 时输入的第一条消息丢失。
-// 现在 startStreamSession 后立即通过 envelope 写入 prompt，保证 Claude 收到。
+// CreateSession 新建会话。Claude 自己生成 UUID，阻塞等待 SessionStart hook
+// 返回真实 session ID（超时 15s）。前端在此期间显示加载动画。
+// 非真实 claude（如 /bin/echo 测试用）直接用 PID 作为 ID，不等待 hook。
 func (a *App) CreateSession(workDir, prompt string) (string, error) {
-	id, err := newID()
+	bin := getBin(a)
+	proc, err := process.Start(workDir, "", bin, process.ModeAuto)
 	if err != nil {
 		return "", err
 	}
-	if err := a.startStreamSession(id, workDir); err != nil {
-		return "", err
-	}
-	if prompt != "" {
-		s, ok := a.lookupSession(id)
-		if ok {
+
+	// 非真实 claude（测试二进制等）：用 PID 作为 ID，不等待 hook
+	if bin != "claude" && !strings.HasSuffix(bin, "/claude") {
+		id := fmt.Sprintf("test-%d", proc.PidForTest())
+		s := session.New(id, workDir)
+		s.SetProcessForTest(proc)
+		a.registerSession(s)
+		a.inst.Put(id, "running")
+		go a.pumpEvents(s, proc)
+		if prompt != "" {
 			_ = s.Send(prompt)
 		}
+		return id, nil
 	}
-	return id, nil
+
+	// 真实 claude：等待 SessionStart hook 返回真实 UUID
+	ch := make(chan string, 1)
+	a.registerPending(ch)
+	defer a.unregisterPending(ch)
+
+	select {
+	case realID := <-ch:
+		s := session.New(realID, workDir)
+		s.SetProcessForTest(proc)
+		a.registerSession(s)
+		a.inst.Put(realID, "running")
+		go a.pumpEvents(s, proc)
+		if prompt != "" {
+			_ = s.Send(prompt)
+		}
+		fmt.Fprintf(os.Stderr, "[DBG] CreateSession: got real id %s\n", realID)
+		return realID, nil
+	case <-time.After(15 * time.Second):
+		proc.Close()
+		return "", fmt.Errorf("session start timeout (15s)")
+	}
+}
+
+func getBin(a *App) string {
+	a.mu().RLock()
+	defer a.mu().RUnlock()
+	bin := a.claudeBin
+	if bin == "" {
+		bin = a.settings.ClaudePath
+	}
+	if bin == "" {
+		bin = "claude"
+	}
+	return bin
 }
 
 // AdoptSession 把 Ease UI 启动前已经存在的历史 session（jsonl 里有但
@@ -143,9 +181,10 @@ func jsonlSessionEnded(sessionID, workDir string) (bool, error) {
 }
 
 // startStreamSession 启 stream-json 进程 + 注册 a.sessions + pumpEvents。
-// CreateSession 和 AdoptSession 共用。失败时回滚注册 + 关进程。
+// CreateSession 用 ModeAuto（Claude 自己生成 UUID）；
+// AdoptSession 用 ModeResume（续写已有 jsonl）。
 func (a *App) startStreamSession(sessionID, workDir string) error {
-	return a.startStreamSessionWithMode(sessionID, workDir, process.ModeNew)
+	return a.startStreamSessionWithMode(sessionID, workDir, process.ModeAuto)
 }
 
 // startStreamSessionWithMode is the mode-aware variant. AdoptSession uses
@@ -246,14 +285,7 @@ func (a *App) CloseSession(sessionID string) error {
 	return err
 }
 
-func newID() (string, error) {
-	b := make([]byte, 8)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
+// newID 生成标准 UUID v4 格式的 session ID（Claude CLI 要求 UUID 格式）。
 var errSessionNotFound = &appError{code: "E_SESSION_NOT_FOUND", msg: "session not found"}
 
 type appError struct {
@@ -282,6 +314,39 @@ func (a *App) lookupSession(id string) (*session.Session, bool) {
 	return s, ok
 }
 
+// pending 通道：CreateSession 等待 SessionStart hook 返回真实 session ID
+var pendingMu sync.Mutex
+var pendingChans []chan string
+
+func (a *App) registerPending(ch chan string) {
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	pendingChans = append(pendingChans, ch)
+}
+
+func (a *App) unregisterPending(ch chan string) {
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	for i, c := range pendingChans {
+		if c == ch {
+			pendingChans = append(pendingChans[:i], pendingChans[i+1:]...)
+			return
+		}
+	}
+}
+
+// deliverSessionID 由 hook 回调调用，将真实 session ID 发给等待中的 CreateSession。
+func deliverSessionID(realID string) {
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	for _, ch := range pendingChans {
+		select {
+		case ch <- realID:
+		default:
+		}
+	}
+}
+
 func (a *App) pumpEvents(s *session.Session, p *process.Process) {
 	topic := "session:" + s.ID
 	fmt.Fprintf(os.Stderr, "[DBG] pumpEvents start: sid=%s pid=%d\n", s.ID, p.PidForTest())
@@ -291,6 +356,7 @@ func (a *App) pumpEvents(s *session.Session, p *process.Process) {
 		if n <= 3 || n%10 == 0 {
 			fmt.Fprintf(os.Stderr, "[DBG] pumpEvents: sid=%s n=%d line=%q\n", s.ID, n, string(line))
 		}
+
 		// 广播原始行给前端，同时也发布到内部 bus
 		a.bus.Publish(topic, line)
 		if a.ctx != nil {

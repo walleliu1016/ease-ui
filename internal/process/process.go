@@ -13,18 +13,16 @@ import (
 	"github.com/akke/ease-ui/internal/protocol"
 )
 
-// Mode 决定 claude 进程的启动模式：开新 session 还是 resume 已存在的 session。
+// Mode 决定 claude 进程的启动模式。
 //
-//   - ModeNew:    用 `--session-id <sid>`。Ease UI 自己生成的全新 sid，
-//     或历史 session 的 jsonl 不存在（首次 adopt）。stream-json envelope
-//     从第一条 user message 开始。
-//   - ModeResume: 用 `--resume <sid>`。该 sid 的 jsonl 已经存在（包括
-//     用户 /exit 退出的"已结束"session）。claude 会读 jsonl 历史，
-//     接受新 user message 继续。-p + stream-json 同样支持 resume。
+//   - ModeAuto:   不传 session flag，Claude 自己生成 UUID（仅新建会话用）。
+//   - ModeNew:    用 `--session-id <sid>`。保留兼容性。
+//   - ModeResume: 用 `--resume <sid>`。续写已有 jsonl。
 type Mode int
 
 const (
-	ModeNew Mode = iota
+	ModeAuto Mode = iota
+	ModeNew
 	ModeResume
 )
 
@@ -61,10 +59,12 @@ func Start(workDir, sessionID, binPath string, mode Mode) (*Process, error) {
 			"--output-format", "stream-json",
 			"--verbose",
 		}
-		if mode == ModeResume {
+		switch mode {
+		case ModeResume:
 			base = append(base, "--resume", sessionID)
-		} else {
+		case ModeNew:
 			base = append(base, "--session-id", sessionID)
+		// ModeAuto: 不传 session flag，Claude 自己生成 UUID
 		}
 		args = base
 	}

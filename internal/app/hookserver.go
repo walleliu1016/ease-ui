@@ -36,6 +36,10 @@ func (a *App) EnsureHookServer() {
 	// 收到 hook 事件 → 通知前端 + 持久化到 instance.json
 	a.hookSrv.OnEvent(func(evt hookserver.HookEvent) {
 		if a.ctx != nil && evt.SessionID != "" {
+			// SessionStart：Claude 返回真实 UUID，通知等待中的 CreateSession
+			if evt.Type == "SessionStart" {
+				deliverSessionID(evt.SessionID)
+			}
 			payload, _ := json.Marshal(evt)
 			wailsruntime.EventsEmit(a.ctx, "hook:"+evt.SessionID, string(payload))
 			if evt.Type == "SessionEnd" {
@@ -98,26 +102,47 @@ func (a *App) HookServerURL() string {
 // sessionStartScriptUnix 生成 Unix (macOS/Linux) SessionStart 脚本。
 func sessionStartScriptUnix(hookURL string) string {
 	return fmt.Sprintf(`#!/bin/bash
-# Ease UI SessionStart hook — 转发到 hook server
+# Ease UI SessionStart hook
+# Forwards session start event to Ease UI HTTP server
 INPUT=$(cat)
-curl -s -X POST %s -H "Content-Type: application/json" -d "$INPUT" > /dev/null 2>&1
+curl -s -X POST %s \
+  -H "Content-Type: application/json" \
+  -d "$INPUT" \
+  > /dev/null 2>&1
 `, hookURL)
 }
 
 // sessionStartScriptWin 生成 Windows SessionStart PowerShell 脚本。
 func sessionStartScriptWin(hookURL string) string {
 	return fmt.Sprintf(`<#
-.SYNOPSIS Ease UI SessionStart hook — 转发到 hook server
+.SYNOPSIS
+    Ease UI SessionStart hook
+.DESCRIPTION
+    Forwards session start event to Ease UI HTTP server
 #>
-$headers = @{ "Content-Type" = "application/json" }
+$headers = @{
+    "Content-Type" = "application/json"
+}
+
+# Read stdin JSON, construct fallback if unavailable
+$jsonInput = $null
 try {
-	if ([Console]::IsInputRedirected) {
-		$jsonInput = [Console]::In.ReadToEnd()
-	} else {
-		$jsonInput = '{"hook_event_name":"SessionStart"}'
-	}
-	Invoke-RestMethod -Uri "%s" -Method POST -Headers $headers -Body $jsonInput -ErrorAction SilentlyContinue | Out-Null
-} catch { }
+    if ([Console]::IsInputRedirected) {
+        $jsonInput = [Console]::In.ReadToEnd()
+    }
+} catch {
+    # stdin not available
+}
+
+if (-not $jsonInput) {
+    $jsonInput = '{"hook_event_name":"SessionStart"}'
+}
+
+try {
+    Invoke-RestMethod -Uri "%s" -Method POST -Headers $headers -Body $jsonInput -ErrorAction SilentlyContinue | Out-Null
+} catch {
+    # Ignore errors silently
+}
 `, hookURL)
 }
 
