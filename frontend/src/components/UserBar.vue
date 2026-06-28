@@ -20,6 +20,7 @@ defineEmits<{ (e: 'settings'): void }>()
 .userbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px; border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .user { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .avatar { font-size: 18px; }

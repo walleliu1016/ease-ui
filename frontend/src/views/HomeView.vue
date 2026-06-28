@@ -59,8 +59,6 @@ const sessions = useSessionsStore()
 useEventStream()
 
 const showNew = ref(false)
-const pending = ref<{ tool: string; args: unknown; reqId: string } | null>(null)
-const toolBlocks = ref<Array<{ name: string; args: unknown }>>([])
 const username = ref('')
 const version = ref('0.1.0')
 const msgContainer = ref<HTMLElement | null>(null)
@@ -74,7 +72,9 @@ onMounted(async () => {
 
 const messages = computed(() => sessions.activeId ? sessions.messages[sessions.activeId] ?? [] : [])
 const isStreaming = computed(() => sessions.activeId ? sessions.streaming[sessions.activeId] : false)
-const state = computed<'idle' | 'running' | 'awaiting_permission'>(() => 'idle')
+const state = computed(() => sessions.activeId ? (sessions.state[sessions.activeId] || 'idle') : 'idle')
+const pending = computed(() => sessions.activeId ? (sessions.pending[sessions.activeId] || null) : null)
+const toolBlocks = computed(() => sessions.activeId ? (sessions.toolBlocks[sessions.activeId] || []) : [])
 const displayName = computed(() => sessions.active?.first_prompt || '新会话')
 
 async function onSend(text: string) {
@@ -109,7 +109,8 @@ async function respondPermission(allow: boolean) {
   if (!pending.value || !sessions.activeId) return
   try {
     await RespondPermission(sessions.activeId, pending.value.reqId, allow)
-    pending.value = null
+    sessions.pending[sessions.activeId] = null
+    sessions.state[sessions.activeId] = 'running'
   } catch (e: any) {
     alert('响应失败：' + (e?.message ?? e))
   }
@@ -127,8 +128,9 @@ function onClose()     { WindowQuit() }
 .left {
   width: 280px; display: flex; flex-direction: column;
   background: var(--bg-panel); border-right: 1px solid var(--border);
+  min-height: 0; overflow: hidden;
 }
-.right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .messages { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .empty { flex: 1; display: flex; align-items: center; justify-content: center; }
 .empty-text { color: var(--text-tertiary); font-size: 12px; }

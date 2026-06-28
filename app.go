@@ -3,17 +3,31 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
+	"fmt"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/akke/ease-ui/internal/app"
+	"github.com/akke/ease-ui/internal/single"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func runApp() error {
+	// 单例锁：阻止同一用户同时跑多个 Ease UI 实例。
+	// 锁由内核在进程退出时自动释放，强杀也不会留下陈旧锁。
+	release, err := single.Acquire()
+	if err != nil {
+		if errors.Is(err, single.ErrAlreadyRunning) {
+			return fmt.Errorf("ease-ui 已在运行（另一个实例持有单例锁，请先关闭）")
+		}
+		return fmt.Errorf("acquire singleton lock: %w", err)
+	}
+	defer func() { _ = release() }()
+
 	a, err := app.New(app.Options{})
 	if err != nil {
 		return err
@@ -21,15 +35,16 @@ func runApp() error {
 
 	err = wails.Run(&options.App{
 		Title:     "Ease",
-		Width:     1100,
-		Height:    720,
-		MinWidth:  900,
-		MinHeight: 600,
+		Width:     1280,
+		Height:    800,
+		MinWidth:  1024,
+		MinHeight: 680,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 0x0A, G: 0x0A, B: 0x0A, A: 1},
 		OnStartup: func(ctx context.Context) {
+			a.SetContext(ctx)
 			wailsruntime.LogInfo(ctx, "ease-ui starting, version "+version)
 		},
 		Bind: []interface{}{ a },

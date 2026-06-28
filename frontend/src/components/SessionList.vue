@@ -29,10 +29,11 @@ defineEmits<{
 </script>
 
 <style scoped>
-.session-list { display: flex; flex-direction: column; height: 100%; }
+.session-list { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
 .add {
@@ -42,6 +43,6 @@ defineEmits<{
   font-size: 14px; font-weight: 600;
 }
 .add:hover { background: var(--accent); color: white; }
-.items { flex: 1; overflow-y: auto; padding: 6px; }
+.items { flex: 1; overflow-y: auto; padding: 6px; min-height: 0; }
 .empty { color: var(--text-tertiary); font-size: 11px; text-align: center; padding: 20px; }
 </style>

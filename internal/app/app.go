@@ -3,6 +3,7 @@
 package app
 
 import (
+	"context"
 	"sync"
 
 	"github.com/akke/ease-ui/internal/auth"
@@ -27,6 +28,13 @@ type App struct {
 	sessions  map[string]*session.Session
 	bus       *events.Bus
 	claudeBin string
+	ctx       context.Context
+}
+
+// SetContext stores the Wails runtime context for later use
+// (e.g. EventsEmit). Called from OnStartup.
+func (a *App) SetContext(ctx context.Context) {
+	a.ctx = ctx
 }
 
 func New(opts Options) (*App, error) {

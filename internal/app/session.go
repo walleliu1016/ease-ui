@@ -3,11 +3,14 @@ package app
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"path/filepath"
 	"sync"
 
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/akke/ease-ui/internal/jsonl"
 	"github.com/akke/ease-ui/internal/process"
+	"github.com/akke/ease-ui/internal/protocol"
 	"github.com/akke/ease-ui/internal/session"
 )
 
@@ -115,7 +118,32 @@ func (a *App) lookupSession(id string) (*session.Session, bool) {
 }
 
 func (a *App) pumpEvents(s *session.Session, p *process.Process) {
+	topic := "session:" + s.ID
 	for line := range p.Events() {
-		a.bus.Publish("session:"+s.ID, line)
+		// 广播原始行给前端，同时也发布到内部 bus
+		a.bus.Publish(topic, line)
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, topic, string(line))
+		}
+
+		// 解析事件并更新 session 状态
+		evt, err := protocol.Parse(line)
+		if err != nil {
+			continue
+		}
+		switch evt.Type {
+		case protocol.EvtPermissionReq:
+			var req protocol.PermissionRequest
+			if json.Unmarshal(evt.Data, &req) == nil {
+				s.RegisterPermission(req.RequestID)
+			}
+		case protocol.EvtResult:
+			s.SetIdle()
+		}
+	}
+	// 子进程退出：清理状态
+	s.SetIdle()
+	if a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, topic, `{"type":"done"}`)
 	}
 }

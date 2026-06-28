@@ -12,18 +12,22 @@
           <label class="form-label">用户名</label>
           <input
             class="form-input"
+            :class="{ error: errorField === 'username' }"
             v-model="username"
             :disabled="locked"
             autocomplete="username"
           />
+          <div class="form-hint">
+            <template v-if="errorField === 'username'">{{ error }}</template>
+          </div>
         </div>
 
         <div class="form-group">
           <label class="form-label">密码</label>
           <input
             class="form-input"
+            :class="{ error: errorField === 'password' }"
             v-model="password"
-            :class="{ error: !!error }"
             type="password"
             placeholder="输入密码"
             :disabled="locked"
@@ -31,11 +35,11 @@
           />
           <div class="form-hint">
             <template v-if="locked">已锁定 · {{ lockCountdown }} 后重试</template>
-            <template v-else-if="error">{{ error }}</template>
+            <template v-else-if="errorField === 'password'">{{ error }}</template>
           </div>
         </div>
 
-        <button class="login-btn" type="submit" :disabled="locked || !password">
+        <button class="login-btn" type="submit" :disabled="locked || !canSubmit">
           登录
         </button>
         <div class="login-footer">Ease v{{ version }}</div>
@@ -57,6 +61,7 @@ const auth = useAuthStore()
 const username = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
+const errorField = ref<'username' | 'password' | null>(null)
 const version = ref('0.1.0')
 
 const locked = computed(() => !!auth.lockedUntil)
@@ -68,16 +73,18 @@ const lockCountdown = computed(() => {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 })
 
+const canSubmit = computed(() => {
+  return username.value.trim().length > 0 && password.value.length > 0
+})
+
 let timer: number | null = null
 onMounted(async () => {
-  // Detect OS user via window.__OS_USER__? For now, fetch from Wails at startup.
-  // We use a simple "akke" placeholder; real impl reads env via a binding.
   try {
     const u = await (window as any).go?.app?.App?.OSUsername?.()
     if (u) username.value = u
   } catch {}
+
   timer = window.setInterval(() => {
-    // trigger computed re-eval
     if (auth.lockedUntil && auth.lockedUntil.getTime() <= Date.now()) {
       auth.lockedUntil = null
     }
@@ -87,9 +94,26 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 
 async function onSubmit() {
   error.value = null
+  errorField.value = null
+
+  if (!username.value.trim()) {
+    error.value = '请输入用户名'
+    errorField.value = 'username'
+    return
+  }
+  if (!password.value) {
+    error.value = '请输入密码'
+    errorField.value = 'password'
+    return
+  }
+
   const err = await auth.login(password.value)
-  if (err) error.value = err
-  else router.push('/home')
+  if (err) {
+    error.value = err
+    errorField.value = 'password'
+    return
+  }
+  router.push('/home')
 }
 
 function onMinimize() { WindowMinimise() }

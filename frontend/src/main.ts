@@ -1,3 +1,4 @@
+import './preload'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
@@ -6,6 +7,9 @@ import './styles/reset.css'
 import './styles/theme.css'
 
 const app = createApp(App)
+app.config.errorHandler = (err, _instance, info) => {
+  console.error('[ease-ui] Vue error:', info, err)
+}
 app.use(createPinia())
 app.use(router)
 app.mount('#app')

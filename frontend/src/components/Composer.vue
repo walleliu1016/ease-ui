@@ -30,6 +30,7 @@ function onSend() {
 .composer {
   display: flex; gap: 8px; padding: 10px 12px;
   background: var(--bg-panel); border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .input {
   flex: 1; resize: none; min-height: 36px; max-height: 120px;

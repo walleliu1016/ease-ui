@@ -1,5 +1,5 @@
 <template>
-  <div class="titlebar" data-tauri-drag-region>
+  <div class="titlebar">
     <div class="titlebar-left">
       <div class="brand-logo">E</div>
       <span class="brand-name">Ease</span>
@@ -46,9 +46,9 @@ defineEmits<{
 }
 .brand-name { font-weight: 600; font-size: 12px; }
 .win-btn {
-  width: 18px; height: 14px; border-radius: 2px;
+  width: 28px; height: 20px; border-radius: 3px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-secondary); font-size: 9px;
+  color: var(--text-secondary); font-size: 11px;
   background: transparent;
   border: none;
   cursor: pointer;

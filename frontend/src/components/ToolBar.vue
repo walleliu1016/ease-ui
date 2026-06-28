@@ -19,6 +19,7 @@ defineEmits<{ (e: 'open-terminal'): void }>()
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 14px; border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
+  flex-shrink: 0;
 }
 .info { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .status { width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); flex-shrink: 0; }

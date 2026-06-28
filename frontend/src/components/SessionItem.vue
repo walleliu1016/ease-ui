@@ -18,11 +18,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import SessionTooltip from './SessionTooltip.vue'
+import { useSessionsStore } from '../stores/sessions'
 import type { SessionMeta } from '../types/session'
 
 const props = defineProps<{ meta: SessionMeta; isActive: boolean }>()
 defineEmits<{ (e: 'select'): void }>()
 
+const sessions = useSessionsStore()
 const showTip = ref(false)
 
 const displayName = computed(() => props.meta.first_prompt || '新会话')
@@ -30,7 +32,7 @@ const displayTime = computed(() => {
   const d = new Date(props.meta.mtime * 1000)
   return d.toLocaleString('zh-CN', { hour12: false })
 })
-const state = computed(() => 'idle')
+const state = computed(() => sessions.state[props.meta.id] || 'idle')
 </script>
 
 <style scoped>
