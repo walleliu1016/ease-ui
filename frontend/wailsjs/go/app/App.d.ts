@@ -54,6 +54,8 @@ export function SetPassword(arg1:string):Promise<void>;
 
 export function Shutdown():Promise<void>;
 
+export function SwitchOwner(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function UpdateSettings(arg1:settings.Config):Promise<void>;
 
 export function Verify(arg1:string):Promise<void>;

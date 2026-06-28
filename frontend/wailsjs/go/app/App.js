@@ -98,6 +98,10 @@ export function Shutdown() {
   return window['go']['app']['App']['Shutdown']();
 }
 
+export function SwitchOwner(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SwitchOwner'](arg1, arg2, arg3);
+}
+
 export function UpdateSettings(arg1) {
   return window['go']['app']['App']['UpdateSettings'](arg1);
 }
