@@ -21,8 +21,13 @@
             @takeback="takeback"
           />
           <div class="messages" ref="msgContainer" @scroll="onScroll">
-            <MessageBubble v-for="m in messages" :key="m.id" :role="m.role" :content="m.content" :ts="m.ts" />
-            <ToolUseBlock v-for="(t, i) in toolBlocks" :key="i" :name="t.name" :args="t.args" />
+            <MessageCard
+              v-for="m in displayMessages"
+              :key="m.id"
+              :role="m.displayRole"
+              :blocks="m.blocks"
+              :ts="m.ts"
+            />
             <PermissionPanel v-if="pending" :tool="pending.tool" :args="pending.args" @respond="respondPermission" />
             <div v-if="isStreaming" class="streaming">
               <span class="dot" /><span class="dot" /><span class="dot" />
@@ -54,8 +59,7 @@ import TitleBar from '../components/TitleBar.vue'
 import SessionList from '../components/SessionList.vue'
 import UserBar from '../components/UserBar.vue'
 import ToolBar from '../components/ToolBar.vue'
-import MessageBubble from '../components/MessageBubble.vue'
-import ToolUseBlock from '../components/ToolUseBlock.vue'
+import MessageCard from '../components/MessageCard.vue'
 import PermissionPanel from '../components/PermissionPanel.vue'
 import Composer from '../components/Composer.vue'
 import NewSessionDialog from '../components/NewSessionDialog.vue'
@@ -80,10 +84,19 @@ onMounted(async () => {
 })
 
 const messages = computed(() => sessions.activeId ? sessions.messages[sessions.activeId] ?? [] : [])
+// tool-reply 角色检测：user 消息里只有 tool_result block 时，UI 渲染为「工具回复」卡（黄底）
+// 与参考实现保持一致。
+const displayMessages = computed(() => messages.value.map((m) => {
+  const isAllToolResult = m.blocks.length > 0 && m.blocks.every((b) => b.type === 'tool_result')
+  let displayRole: 'user' | 'assistant' | 'tool-reply'
+  if (m.role === 'user' && isAllToolResult) displayRole = 'tool-reply'
+  else if (m.role === 'user' || m.role === 'assistant') displayRole = m.role
+  else displayRole = 'assistant' // 旧 jsonl 的 'tool' role 降级
+  return { ...m, displayRole }
+}))
 const isStreaming = computed(() => sessions.activeId ? sessions.streaming[sessions.activeId] : false)
 const state = computed(() => sessions.activeId ? (sessions.state[sessions.activeId] || 'idle') : 'idle')
 const pending = computed(() => sessions.activeId ? (sessions.pending[sessions.activeId] || null) : null)
-const toolBlocks = computed(() => sessions.activeId ? (sessions.toolBlocks[sessions.activeId] || []) : [])
 const displayName = computed(() => sessions.active?.first_prompt || '新会话')
 // 'app' 默认；'terminal' 表示外部 claude -r 持 stdin（ToolBar 渲染"切回"按钮）
 const owner = computed<'app' | 'terminal'>(() =>
@@ -93,7 +106,6 @@ const isTerminalMode = computed(() => owner.value === 'terminal')
 
 // 切换会话或新消息到达时，滚动到底部
 watch(messages, () => { nextTick(() => scrollToBottom()) })
-watch(toolBlocks, () => { nextTick(() => scrollToBottom()) })
 
 async function onSend(text: string) {
   if (!sessions.activeId) return

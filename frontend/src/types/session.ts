@@ -15,11 +15,14 @@ export interface SessionMeta {
   size: number
 }
 
+import type { ContentBlock } from './blocks'
+
 export interface ChatMessage {
   id: string
   msgId?: string // Claude 消息 uuid，用于流式事件去重
+  // JSONL 原始 role（'user' / 'assistant' / 'tool'）。UI 渲染用的 displayRole
+  // 会在 HomeView 里根据 blocks 内容二次判断（比如 user + 全 tool_result → 'tool-reply'）。
   role: 'user' | 'assistant' | 'tool'
-  content: string
-  tool?: { name: string; args: unknown }
+  blocks: ContentBlock[] // 结构化 content blocks（见 ./blocks.ts）
   ts: number
 }
