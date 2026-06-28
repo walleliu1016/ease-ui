@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { SessionMeta, ChatMessage, SessionState } from '../types/session'
-import { ListSessions, CreateSession, SendMessage, GetSessionMessages, GetSessionStates, SwitchOwner } from '../composables/useWails'
+import { ListSessions, CreateSession, SendMessage, GetSessionMessages, GetSessionStates, SwitchOwner, AdoptSession } from '../composables/useWails'
 
 export interface PendingPerm {
   tool: string
@@ -121,6 +121,10 @@ export const useSessionsStore = defineStore('sessions', () => {
   // stream-json，'resume' = -r <sid>。
   const owner = ref<Record<string, 'app' | 'terminal'>>({})
   const mode  = ref<Record<string, 'stream' | 'resume'>>({})
+  // adopted: 标记 sid 已在 Go 端 a.sessions map 注册（CreateSession
+  // 或 AdoptSession 后置 true）。send() 时按需 AdoptSession 拉起
+  // stream-json 进程接管历史 session。
+  const adopted = ref<Record<string, boolean>>({})
 
   const active = computed(() => list.value.find((s) => s.id === activeId.value) ?? null)
 
@@ -137,6 +141,11 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function create(workdir: string, prompt: string) {
     const id = await CreateSession(workdir, prompt)
+    // CreateSession 后 Go 端已在 a.sessions map 注册，标记 adopted
+    // 避免 send() 重复走 AdoptSession 路径
+    adopted.value = { ...adopted.value, [id]: true }
+    owner.value = { ...owner.value, [id]: 'app' }
+    mode.value  = { ...mode.value,  [id]: 'stream' }
     await refresh()
     activeId.value = id
     return id
@@ -198,7 +207,18 @@ export const useSessionsStore = defineStore('sessions', () => {
         owner.value = { ...owner.value, [id]: 'app' }
         mode.value  = { ...mode.value,  [id]: 'stream' }
       } else {
-        // App 模式：直写（Send 走 v1 裸文本兼容路径，Claude 接受）
+        // App 模式：先确保 session 已在 a.sessions map 注册（lazy adopt），
+        // 历史 session（jsonl 里有但 Ease UI 启动时没注册）走 AdoptSession
+        // 拉起 stream-json 进程；CreateSession 出来的已 adopt 走幂等 noop。
+        if (!adopted.value[id]) {
+          const meta = list.value.find((s) => s.id === id)
+          if (!meta) throw new Error('session not found in list')
+          await AdoptSession(id, meta.workdir)
+          adopted.value = { ...adopted.value, [id]: true }
+          owner.value = { ...owner.value, [id]: 'app' }
+          mode.value  = { ...mode.value,  [id]: 'stream' }
+        }
+        // 直写（Send 走 v1 裸文本兼容路径，Claude 接受）
         await SendMessage(id, prompt)
       }
     } finally {
@@ -272,5 +292,5 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   return { list, activeId, active, messages, streaming, state, pending, toolBlocks,
-    hasMore, owner, mode, refresh, create, select, send, handleEvent, handleHookEvent, loadMore }
+    hasMore, owner, mode, adopted, refresh, create, select, send, handleEvent, handleHookEvent, loadMore }
 })

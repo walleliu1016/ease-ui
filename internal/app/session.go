@@ -58,6 +58,30 @@ func (a *App) CreateSession(workDir, _prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return id, a.startStreamSession(id, workDir)
+}
+
+// AdoptSession 把 Ease UI 启动前已经存在的历史 session（jsonl 里有但
+// a.sessions map 没注册）拉进 App 控制。
+//
+// 用途：前端 ListSessions 拿全量 jsonl，用户切到一条历史 session + 第一次
+// 发消息时 → 先 AdoptSession 起 stream-json 进程接管 + 注册到 a.sessions，
+// 再 SendMessage 写 prompt。已在 a.sessions 里的 sid 走幂等 noop。
+//
+// 跟 CreateSession 的差别：sid 是调用方给的（不是新生成）；不写 prompt。
+func (a *App) AdoptSession(sessionID, workDir string) error {
+	if _, ok := a.lookupSession(sessionID); ok {
+		return nil // 已经在 App 控制中，幂等 noop
+	}
+	if sessionID == "" || workDir == "" {
+		return &appError{code: "E_BAD_ARG", msg: "AdoptSession: sessionID and workDir required"}
+	}
+	return a.startStreamSession(sessionID, workDir)
+}
+
+// startStreamSession 启 stream-json 进程 + 注册 a.sessions + pumpEvents。
+// CreateSession 和 AdoptSession 共用。失败时回滚注册 + 关进程。
+func (a *App) startStreamSession(sessionID, workDir string) error {
 	a.mu().RLock()
 	bin := a.claudeBin
 	if bin == "" {
@@ -68,17 +92,17 @@ func (a *App) CreateSession(workDir, _prompt string) (string, error) {
 		bin = "claude"
 	}
 
-	proc, err := process.Start(workDir, id, bin)
+	proc, err := process.Start(workDir, sessionID, bin)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	s := session.New(id, workDir)
+	s := session.New(sessionID, workDir)
 	s.SetProcessForTest(proc)
 	a.registerSession(s)
-	a.inst.Put(id, "idle")
+	a.inst.Put(sessionID, "idle")
 	go a.pumpEvents(s, proc)
-	return id, nil
+	return nil
 }
 
 func (a *App) SendMessage(sessionID, prompt string) error {

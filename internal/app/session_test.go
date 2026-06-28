@@ -98,3 +98,56 @@ func TestEnvelopeUserMessage_Format(t *testing.T) {
 	assert.True(t, strings.HasSuffix(env, "\n"),
 		"envelope must be newline-terminated for stream-json framing")
 }
+
+func TestAdoptSession_RegistersAndStarts(t *testing.T) {
+	dir := t.TempDir()
+	a, err := New(Options{ConfigDir: dir})
+	require.NoError(t, err)
+	a.SetClaudeBinary("/bin/echo") // 测试用 echo 模拟 claude（实际 stream-json 不可用但能起进程）
+
+	// 假定 sid 来自 jsonl（Ease UI 启动前已存在）
+	sid := "abcd1234abcd1234"
+	if err := a.AdoptSession(sid, "/tmp"); err != nil {
+		t.Skipf("cannot start process: %v", err)
+	}
+
+	s, ok := a.lookupSession(sid)
+	require.True(t, ok, "AdoptSession should register the session in a.sessions")
+	assert.Equal(t, session.OwnerApp, s.Owner())
+	assert.Equal(t, session.ModeStream, s.Mode())
+}
+
+func TestAdoptSession_IdempotentNoop(t *testing.T) {
+	dir := t.TempDir()
+	a, err := New(Options{ConfigDir: dir})
+	require.NoError(t, err)
+	a.SetClaudeBinary("/bin/echo")
+
+	sid := "abcd1234abcd1234"
+	if err := a.AdoptSession(sid, "/tmp"); err != nil {
+		t.Skipf("cannot start process: %v", err)
+	}
+	s1, _ := a.lookupSession(sid)
+	require.NotNil(t, s1)
+	firstProc := s1.GetProcessForTest()
+
+	// 第二次调用：幂等，不重起进程
+	require.NoError(t, a.AdoptSession(sid, "/tmp"))
+	s2, _ := a.lookupSession(sid)
+	assert.Same(t, firstProc, s2.GetProcessForTest(),
+		"idempotent AdoptSession must not replace the existing process")
+}
+
+func TestAdoptSession_RejectsEmptyArgs(t *testing.T) {
+	dir := t.TempDir()
+	a, err := New(Options{ConfigDir: dir})
+	require.NoError(t, err)
+
+	err = a.AdoptSession("", "/tmp")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
+
+	err = a.AdoptSession("sid", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
+}

@@ -6,6 +6,8 @@ import {settings} from '../models';
 import {time} from '../models';
 import {context} from '../models';
 
+export function AdoptSession(arg1:string,arg2:string):Promise<void>;
+
 export function CheckAndFixHooks():Promise<boolean>;
 
 export function ClearPassword():Promise<void>;

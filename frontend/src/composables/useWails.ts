@@ -30,6 +30,7 @@ declare global {
           CheckAndFixHooks: () => Promise<boolean>
           GetSessionStates: () => Promise<Record<string, string>>
           SwitchOwner: (id: string, target: string, prompt: string) => Promise<void>
+          AdoptSession: (id: string, workDir: string) => Promise<void>
         }
       }
       main?: any
@@ -78,6 +79,7 @@ export const GetHookServerPort  = () => app().GetHookServerPort()
 export const CheckAndFixHooks   = () => app().CheckAndFixHooks()
 export const GetSessionStates  = () => app().GetSessionStates()
 export const SwitchOwner       = (id: string, target: string, prompt: string) => app().SwitchOwner(id, target, prompt)
+export const AdoptSession      = (id: string, workDir: string) => app().AdoptSession(id, workDir)
 
 // runtime helpers
 export const EventsOn           = (event: string, cb: (...args: any[]) => void) => runtime().EventsOn(event, cb)

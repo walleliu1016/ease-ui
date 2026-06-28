@@ -289,5 +289,13 @@ func (s *Session) SetProcessForTest(p ProcessIface) {
 	s.setProcess(p)
 }
 
+// GetProcessForTest returns the attached process. For app-layer tests that
+// need to assert idempotency ("did we leak a second process?").
+func (s *Session) GetProcessForTest() ProcessIface {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.proc
+}
+
 // UnlockIfLocked / Locked helpers used by tests; keep tiny
 func (s *Session) UnlockIfLocked() {}
