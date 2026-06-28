@@ -6,17 +6,27 @@ import {settings} from '../models';
 import {time} from '../models';
 import {context} from '../models';
 
+export function CheckAndFixHooks():Promise<boolean>;
+
 export function ClearPassword():Promise<void>;
 
 export function CloseSession(arg1:string):Promise<void>;
 
 export function CreateSession(arg1:string,arg2:string):Promise<string>;
 
+export function EnsureHookServer():Promise<void>;
+
+export function GetHookServerPort():Promise<number>;
+
 export function GetHooksConfig():Promise<app.HooksConfig>;
 
 export function GetSessionMessages(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<jsonl.Message>>;
 
+export function GetSessionStates():Promise<Record<string, string>>;
+
 export function GetSettings():Promise<settings.Config>;
+
+export function HookServerURL():Promise<string>;
 
 export function IsInitialized():Promise<boolean>;
 

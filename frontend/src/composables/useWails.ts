@@ -26,6 +26,9 @@ declare global {
           OpenInTerminal: (workdir: string, sessionId: string, binPath: string) => Promise<void>
           GetSessionMessages: (id: string, workdir: string, offset: number, limit: number) => Promise<Array<{Role: string; Content: string; Type: string}>>
           PickDirectory: () => Promise<string>
+          GetHookServerPort: () => Promise<number>
+          CheckAndFixHooks: () => Promise<boolean>
+          GetSessionStates: () => Promise<Record<string, string>>
         }
       }
       main?: any
@@ -70,6 +73,9 @@ export const SaveHooksConfig  = (cfg: any) => app().SaveHooksConfig(cfg)
 export const OpenInTerminal   = (workdir: string, sessionId: string, binPath: string) => app().OpenInTerminal(workdir, sessionId, binPath)
 export const GetSessionMessages = (id: string, workdir: string, offset: number, limit: number) => app().GetSessionMessages(id, workdir, offset, limit)
 export const PickDirectory     = () => app().PickDirectory()
+export const GetHookServerPort  = () => app().GetHookServerPort()
+export const CheckAndFixHooks   = () => app().CheckAndFixHooks()
+export const GetSessionStates  = () => app().GetSessionStates()
 
 // runtime helpers
 export const EventsOn           = (event: string, cb: (...args: any[]) => void) => runtime().EventsOn(event, cb)

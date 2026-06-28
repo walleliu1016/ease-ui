@@ -54,7 +54,7 @@ const html = computed(() => {
   border-left: 2px solid var(--accent); padding-left: 10px; margin: 8px 0;
   color: var(--text-secondary);
 }
-.markdown-body :deep(a) { color: var(--accent-light); }
+.markdown-body :deep(a) { color: var(--accent-light); text-decoration: none; }
 .markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3),
 .markdown-body :deep(h4), .markdown-body :deep(h5), .markdown-body :deep(h6) {
   margin: 10px 0 4px; font-weight: 600;

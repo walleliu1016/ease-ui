@@ -9,6 +9,8 @@ import (
 	"github.com/akke/ease-ui/internal/auth"
 	"github.com/akke/ease-ui/internal/events"
 	"github.com/akke/ease-ui/internal/hooks"
+	"github.com/akke/ease-ui/internal/hookserver"
+	"github.com/akke/ease-ui/internal/instance"
 	"github.com/akke/ease-ui/internal/session"
 	"github.com/akke/ease-ui/internal/settings"
 )
@@ -29,6 +31,10 @@ type App struct {
 	bus       *events.Bus
 	claudeBin string
 	ctx       context.Context
+	hookSrv   *hookserver.Server
+	hookMu    sync.RWMutex
+	hookPort  int
+	inst      *instance.Store
 }
 
 // SetContext stores the Wails runtime context for later use
@@ -53,6 +59,9 @@ func New(opts Options) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 确保 settings.json 存在（首次运行时自动创建默认配置）
+	_ = settings.Save(cfg)
+	inst, _ := instance.Load()
 	return &App{
 		opts:     opts,
 		auth:     a,
@@ -60,5 +69,6 @@ func New(opts Options) (*App, error) {
 		handler:  hooks.NewHandler(cfg.AutoAllowBash),
 		bus:      events.NewBus(),
 		sessions: map[string]*session.Session{},
+		inst:     inst,
 	}, nil
 }

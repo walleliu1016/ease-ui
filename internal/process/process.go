@@ -35,6 +35,7 @@ func Start(workDir, sessionID, binPath string) (*Process, error) {
 		args = []string{
 			"--cwd", workDir,
 			"--session-id", sessionID,
+			"--input-format", "stream-json",
 			"--output-format", "stream-json",
 			"--verbose",
 		}

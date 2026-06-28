@@ -43,7 +43,7 @@ var (
 
 func defaultPath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".ease-ui", "auth.json")
+	return filepath.Join(home, ".ease-app", "auth.json")
 }
 
 func SetPath(p string) {

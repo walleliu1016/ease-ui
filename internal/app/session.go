@@ -28,9 +28,20 @@ func (a *App) ListSessions() ([]jsonl.SessionMeta, error) {
 	return jsonl.ScanAll()
 }
 
+// GetSessionStates 返回持久化的会话状态（用于启动时恢复）。
+func (a *App) GetSessionStates() map[string]string {
+	out := map[string]string{}
+	list, _ := a.ListSessions()
+	for _, m := range list {
+		s := a.inst.Get(m.ID)
+		if s.State != "" {
+			out[m.ID] = s.State
+		}
+	}
+	return out
+}
+
 // CreateSession launches a new claude subprocess for the given workdir + prompt.
-// The session ID is generated client-side (a hex string); callers should write
-// the same ID into the jsonl so the App can re-attach.
 func (a *App) CreateSession(workDir, _prompt string) (string, error) {
 	id, err := newID()
 	if err != nil {
@@ -52,8 +63,9 @@ func (a *App) CreateSession(workDir, _prompt string) (string, error) {
 	}
 
 	s := session.New(id, workDir)
-	s.SetProcessForTest(proc) // see session package: exposes a setter
+	s.SetProcessForTest(proc)
 	a.registerSession(s)
+	a.inst.Put(id, "idle")
 	go a.pumpEvents(s, proc)
 	return id, nil
 }
@@ -94,7 +106,11 @@ func (a *App) CloseSession(sessionID string) error {
 	if !ok {
 		return errSessionNotFound
 	}
-	return s.Close()
+	err := s.Close()
+	if err == nil {
+		a.inst.Put(sessionID, "done")
+	}
+	return err
 }
 
 func newID() (string, error) {

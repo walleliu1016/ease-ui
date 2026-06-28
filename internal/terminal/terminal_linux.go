@@ -6,20 +6,27 @@ import (
 )
 
 func (l *Launcher) buildArgs(workDir, cmd string) []string {
-	// Try several terminals in order, fall back to xterm if none found.
-	// Caller runs Start so the rest of the args is irrelevant for unit
-	// tests; the function returns one set.
-	for _, term := range []string{"gnome-terminal", "xterm", "x-terminal-emulator"} {
-		if _, err := exec.LookPath(term); err == nil {
-			switch term {
-			case "gnome-terminal":
-				return []string{"gnome-terminal", "--working-directory=" + workDir, "--", "bash", "-c", cmd + "; exec bash"}
-			case "xterm":
-				return []string{"xterm", "-e", fmt.Sprintf("cd %s && %s; bash", workDir, cmd)}
-			default:
-				return []string{"x-terminal-emulator", "-e", fmt.Sprintf("cd %s && %s; bash", workDir, cmd)}
-			}
+	// 依次尝试主流终端
+	terms := []struct {
+		bin  string
+		args func() []string
+	}{
+		{"gnome-terminal", func() []string {
+			return []string{"gnome-terminal", "--working-directory=" + workDir, "--", "bash", "-c", cmd + "; exec bash"}
+		}},
+		{"konsole", func() []string {
+			return []string{"konsole", "--workdir", workDir, "-e", "bash", "-c", cmd + "; exec bash"}
+		}},
+		{"xterm", func() []string {
+			return []string{"xterm", "-e", fmt.Sprintf("cd %s && %s; bash", workDir, cmd)}
+		}},
+	}
+
+	for _, t := range terms {
+		if _, err := exec.LookPath(t.bin); err == nil {
+			return t.args()
 		}
 	}
-	return []string{"xterm", "-e", fmt.Sprintf("cd %s && %s; bash", workDir, cmd)}
+	// 兜底：x-terminal-emulator
+	return []string{"x-terminal-emulator", "-e", fmt.Sprintf("cd %s && %s; bash", workDir, cmd)}
 }

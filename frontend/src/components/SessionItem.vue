@@ -101,6 +101,7 @@ const state = computed(() => sessions.state[props.meta.id] || 'idle')
 }
 .status-dot.running { background: var(--status-success); }
 .status-dot.awaiting_permission { background: var(--status-warn); }
+.status-dot.done { background: var(--text-tertiary); }
 .body { flex: 1; min-width: 0; }
 .row1 {
   display: flex; align-items: center; justify-content: space-between;

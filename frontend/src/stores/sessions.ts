@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { SessionMeta, ChatMessage, SessionState } from '../types/session'
-import { ListSessions, CreateSession, SendMessage, GetSessionMessages } from '../composables/useWails'
+import { ListSessions, CreateSession, SendMessage, GetSessionMessages, GetSessionStates } from '../composables/useWails'
 
 export interface PendingPerm {
   tool: string
@@ -44,11 +44,19 @@ export const useSessionsStore = defineStore('sessions', () => {
   const toolBlocks = ref<Record<string, Array<{ name: string; args: unknown }>>>({})
   const historyOffset = ref<Record<string, number>>({})
   const hasMore = ref<Record<string, boolean>>({})
+  const terminalMode = ref<Record<string, boolean>>({})
 
   const active = computed(() => list.value.find((s) => s.id === activeId.value) ?? null)
 
   async function refresh() {
     list.value = await ListSessions()
+    // 恢复持久化的会话状态
+    try {
+      const states = await GetSessionStates()
+      for (const [id, st] of Object.entries(states)) {
+        state.value = { ...state.value, [id]: st as SessionState }
+      }
+    } catch {}
   }
 
   async function create(workdir: string, prompt: string) {
@@ -152,6 +160,30 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
+  // 处理来自 Go 端 hook server 的事件（SessionStart/SessionEnd/idle_timeout）
+  function handleHookEvent(sid: string, line: string) {
+    let evt: any
+    try { evt = JSON.parse(line) } catch { return }
+    switch (evt.type) {
+      case 'SessionEnd':
+        state.value = { ...state.value, [sid]: 'done' }
+        terminalMode.value = { ...terminalMode.value, [sid]: false }
+        break
+      case 'PreToolUse':
+      case 'PostToolUse':
+      case 'UserPromptSubmit':
+        // 外部终端有活动，标记为终端模式
+        terminalMode.value = { ...terminalMode.value, [sid]: true }
+        break
+      case 'idle_timeout':
+        // 仅当不是 running/awaiting_permission 时才标记 idle
+        if (state.value[sid] !== 'running' && state.value[sid] !== 'awaiting_permission') {
+          state.value = { ...state.value, [sid]: 'idle' }
+        }
+        break
+    }
+  }
+
   return { list, activeId, active, messages, streaming, state, pending, toolBlocks,
-    hasMore, refresh, create, select, send, handleEvent, loadMore }
+    hasMore, terminalMode, refresh, create, select, send, handleEvent, handleHookEvent, loadMore }
 })

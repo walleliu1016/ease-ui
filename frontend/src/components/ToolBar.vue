@@ -23,7 +23,7 @@ const props = defineProps<{
   path: string
   sessionId: string
   msgCount: number
-  state: 'idle' | 'running' | 'awaiting_permission'
+  state: 'idle' | 'running' | 'awaiting_permission' | 'done'
 }>()
 defineEmits<{ (e: 'open-terminal'): void }>()
 
@@ -45,6 +45,7 @@ const projectName = computed(() => {
 .status { width: 7px; height: 7px; border-radius: 50%; background: var(--text-tertiary); flex-shrink: 0; }
 .status.running { background: var(--status-success); }
 .status.awaiting_permission { background: var(--status-warn); }
+.status.done { background: var(--text-tertiary); }
 .title {
   font-size: 12px; color: var(--text-primary); font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

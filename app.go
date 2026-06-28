@@ -45,6 +45,7 @@ func runApp() error {
 		BackgroundColour: &options.RGBA{R: 0x0A, G: 0x0A, B: 0x0A, A: 1},
 		OnStartup: func(ctx context.Context) {
 			a.SetContext(ctx)
+			a.EnsureHookServer()
 			wailsruntime.LogInfo(ctx, "ease-ui starting, version "+version)
 		},
 		Bind: []interface{}{ a },

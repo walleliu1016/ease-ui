@@ -6,9 +6,9 @@ export function useEventStream() {
   const sessions = useSessionsStore()
   const cleanups: Array<() => void> = []
   let sessionCleanup: (() => void) | null = null
+  let hookCleanup: (() => void) | null = null
 
   onMounted(() => {
-    // 应用级事件
     cleanups.push(EventsOn('app:toast', (level: string, message: string) => {
       console.log('[toast]', level, message)
     }))
@@ -16,17 +16,21 @@ export function useEventStream() {
       console.error('[fatal]', msg)
     }))
 
-    // 监听活跃会话切换，订阅对应 session 流事件
     watch(
       () => sessions.activeId,
       (newId, oldId) => {
         if (oldId) {
           sessionCleanup?.()
+          hookCleanup?.()
           sessionCleanup = null
+          hookCleanup = null
         }
         if (newId) {
           sessionCleanup = EventsOn(`session:${newId}`, (line: string) => {
             sessions.handleEvent(newId, line)
+          })
+          hookCleanup = EventsOn(`hook:${newId}`, (line: string) => {
+            sessions.handleHookEvent(newId, line)
           })
         }
       },
@@ -36,6 +40,7 @@ export function useEventStream() {
 
   onBeforeUnmount(() => {
     sessionCleanup?.()
+    hookCleanup?.()
     cleanups.forEach((fn) => fn())
   })
 

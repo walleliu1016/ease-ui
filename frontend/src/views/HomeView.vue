@@ -26,7 +26,11 @@
               <span class="dot" /><span class="dot" /><span class="dot" />
             </div>
           </div>
-          <Composer :disabled="state === 'awaiting_permission'" @send="onSend" />
+          <Composer
+            :disabled="state === 'awaiting_permission' || !!sessions.terminalMode[sessions.activeId || '']"
+            :placeholder="sessions.terminalMode[sessions.activeId || ''] ? '会话已在外部终端中打开' : undefined"
+            @send="onSend"
+          />
         </template>
         <div v-else class="empty">
           <div class="empty-text">选择左侧会话，或点击 + 创建新会话</div>

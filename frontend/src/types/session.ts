@@ -1,4 +1,4 @@
-export type SessionState = 'idle' | 'running' | 'awaiting_permission'
+export type SessionState = 'idle' | 'running' | 'awaiting_permission' | 'done'
 
 export interface SessionMeta {
   id: string
