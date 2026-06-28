@@ -323,9 +323,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     const tp = evt.hook_event_name || evt.type
     switch (tp) {
       case 'SessionStart':
-        // 外部终端启动了 claude -r，标记 owner=terminal
-        owner.value = { ...owner.value, [sid]: 'terminal' }
-        mode.value  = { ...mode.value,  [sid]: 'resume' }
+        // 仅当 Ease UI 未控制此 session 时才标记为外部终端
+        // CreateSession 新建的 session 已设 owner=app，不覆盖
+        if (owner.value[sid] !== 'app') {
+          owner.value = { ...owner.value, [sid]: 'terminal' }
+          mode.value  = { ...mode.value,  [sid]: 'resume' }
+        }
         break
       case 'SessionEnd':
         state.value = { ...state.value, [sid]: 'done' }
