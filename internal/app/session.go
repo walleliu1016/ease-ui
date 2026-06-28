@@ -76,11 +76,11 @@ func (a *App) RespondPermission(sessionID, reqID string, allow bool) error {
 
 // GetSessionMessages reads the jsonl history for a session and returns
 // all messages. Used when switching to a session that has no active process.
-func (a *App) GetSessionMessages(sessionID, workDir string) ([]jsonl.Message, error) {
+func (a *App) GetSessionMessages(sessionID, workDir string, offset, limit int) ([]jsonl.Message, error) {
 	root := jsonl.Root()
 	encodedDir := encodeProjectDirName(workDir)
 	path := filepath.Join(root, encodedDir, sessionID+".jsonl")
-	return jsonl.ParseFile(path)
+	return jsonl.ParseFileRange(path, offset, limit)
 }
 
 // encodeProjectDirName converts "/Users/akke/foo" to "-Users-akke-foo"

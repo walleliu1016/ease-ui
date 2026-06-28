@@ -18,7 +18,7 @@
             :state="state"
             @open-terminal="openTerminal"
           />
-          <div class="messages" ref="msgContainer">
+          <div class="messages" ref="msgContainer" @scroll="onScroll">
             <MessageBubble v-for="m in messages" :key="m.id" :role="m.role" :content="m.content" :ts="m.ts" />
             <ToolUseBlock v-for="(t, i) in toolBlocks" :key="i" :name="t.name" :args="t.args" />
             <PermissionPanel v-if="pending" :tool="pending.tool" :args="pending.args" @respond="respondPermission" />
@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, nextTick } from 'vue'
+import { onMounted, ref, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import TitleBar from '../components/TitleBar.vue'
 import SessionList from '../components/SessionList.vue'
@@ -80,6 +80,10 @@ const pending = computed(() => sessions.activeId ? (sessions.pending[sessions.ac
 const toolBlocks = computed(() => sessions.activeId ? (sessions.toolBlocks[sessions.activeId] || []) : [])
 const displayName = computed(() => sessions.active?.first_prompt || '新会话')
 
+// 切换会话或新消息到达时，滚动到底部
+watch(messages, () => { nextTick(() => scrollToBottom()) })
+watch(toolBlocks, () => { nextTick(() => scrollToBottom()) })
+
 async function onSend(text: string) {
   if (!sessions.activeId) return
   await sessions.send(sessions.activeId, text)
@@ -89,6 +93,15 @@ async function onSend(text: string) {
 
 function scrollToBottom() {
   if (msgContainer.value) msgContainer.value.scrollTop = msgContainer.value.scrollHeight
+}
+
+function onScroll() {
+  const el = msgContainer.value
+  if (!el) return
+  // 滚动到顶部时加载更多
+  if (el.scrollTop <= 10 && sessions.hasMore[sessions.activeId || '']) {
+    sessions.loadMore()
+  }
 }
 
 async function onCreate(workdir: string, prompt: string) {

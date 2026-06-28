@@ -10,7 +10,6 @@ export interface PendingPerm {
 }
 
 // 解析 Claude API content block，提取文本拼成 markdown。
-// raw 可能是 plain string，也可能是 content-block 数组。
 function formatContent(raw: any): string {
   if (Array.isArray(raw)) {
     return raw
@@ -33,6 +32,8 @@ function formatContent(raw: any): string {
   return String(raw || '')
 }
 
+const PAGE_SIZE = 100
+
 export const useSessionsStore = defineStore('sessions', () => {
   const list = ref<SessionMeta[]>([])
   const activeId = ref<string | null>(null)
@@ -41,6 +42,8 @@ export const useSessionsStore = defineStore('sessions', () => {
   const state = ref<Record<string, SessionState>>({})
   const pending = ref<Record<string, PendingPerm | null>>({})
   const toolBlocks = ref<Record<string, Array<{ name: string; args: unknown }>>>({})
+  const historyOffset = ref<Record<string, number>>({})
+  const hasMore = ref<Record<string, boolean>>({})
 
   const active = computed(() => list.value.find((s) => s.id === activeId.value) ?? null)
 
@@ -59,25 +62,43 @@ export const useSessionsStore = defineStore('sessions', () => {
     activeId.value = id
     const meta = list.value.find((s) => s.id === id)
     if (meta && !messages.value[id]) {
-      loadHistory(id, meta.workdir)
+      // 默认加载最后 PAGE_SIZE 条
+      const total = meta.msg_count
+      loadHistory(id, meta.workdir, Math.max(0, total - PAGE_SIZE), PAGE_SIZE, true)
     }
   }
 
-  async function loadHistory(sid: string, workdir: string) {
+  async function loadHistory(sid: string, workdir: string, offset: number, limit: number, isFirst: boolean) {
     try {
-      const raw = await GetSessionMessages(sid, workdir)
-      messages.value = {
-        ...messages.value,
-        [sid]: (raw || []).map((m: any, i: number) => ({
-          id: `${sid}-${i}`,
-          role: m.role || m.Role || 'assistant',
-          content: formatContent(m.content || m.Content || ''),
-          ts: Date.now() - ((raw || []).length - i) * 1000,
-        })),
+      const raw = await GetSessionMessages(sid, workdir, offset, limit)
+      const msgs = (raw || []).map((m: any, i: number) => ({
+        id: `${sid}-${offset + i}`,
+        role: m.role || m.Role || 'assistant',
+        content: formatContent(m.content || m.Content || ''),
+        ts: Date.now() - ((raw?.length || 0) - i) * 1000,
+      }))
+      if (isFirst) {
+        messages.value = { ...messages.value, [sid]: msgs }
+      } else {
+        const prev = messages.value[sid] || []
+        messages.value = { ...messages.value, [sid]: [...msgs, ...prev] }
       }
+      historyOffset.value = { ...historyOffset.value, [sid]: offset + (raw?.length || 0) }
+      hasMore.value = { ...hasMore.value, [sid]: offset > 0 }
     } catch (e: any) {
       console.error('[sessions] loadHistory failed:', e?.message || e)
     }
+  }
+
+  async function loadMore() {
+    const id = activeId.value
+    if (!id) return
+    const meta = list.value.find((s) => s.id === id)
+    if (!meta) return
+    const loaded = historyOffset.value[id] || meta.msg_count
+    const nextStart = Math.max(0, loaded - PAGE_SIZE)
+    if (nextStart >= loaded) return
+    await loadHistory(id, meta.workdir, nextStart, loaded - nextStart, false)
   }
 
   async function send(id: string, prompt: string) {
@@ -131,5 +152,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  return { list, activeId, active, messages, streaming, state, pending, toolBlocks, refresh, create, select, send, handleEvent }
+  return { list, activeId, active, messages, streaming, state, pending, toolBlocks,
+    hasMore, refresh, create, select, send, handleEvent, loadMore }
 })

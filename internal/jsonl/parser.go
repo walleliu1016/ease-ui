@@ -59,20 +59,41 @@ type rawLine struct {
 }
 
 func ParseFile(path string) ([]Message, error) {
+	return ParseFileRange(path, 0, 0)
+}
+
+// ParseFileRange reads lines [start, start+limit) from a jsonl file.
+// If start==0 && limit==0, reads all.
+func ParseFileRange(path string, start, limit int) ([]Message, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
+	type rawLine struct {
+		Type    string          `json:"type"`
+		Message json.RawMessage `json:"message"`
+	}
+
 	var out []Message
+	var lineNum int
 	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 1024*1024), 50*1024*1024) // up to 50MB lines
+	scanner.Buffer(make([]byte, 1024*1024), 50*1024*1024)
 
 	for scanner.Scan() {
+		lineNum++
+		// Skip lines before start
+		if start > 0 && lineNum <= start {
+			continue
+		}
+		// Stop when we have enough
+		if limit > 0 && len(out) >= limit {
+			break
+		}
 		var rl rawLine
 		if err := json.Unmarshal(scanner.Bytes(), &rl); err != nil {
-			continue // skip bad lines
+			continue
 		}
 		var m Message
 		if err := json.Unmarshal(rl.Message, &m); err != nil {

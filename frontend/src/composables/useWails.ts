@@ -24,7 +24,7 @@ declare global {
           GetHooksConfig: () => Promise<any>
           SaveHooksConfig: (cfg: any) => Promise<void>
           OpenInTerminal: (workdir: string, sessionId: string, binPath: string) => Promise<void>
-          GetSessionMessages: (id: string, workdir: string) => Promise<Array<{Role: string; Content: string; Type: string}>>
+          GetSessionMessages: (id: string, workdir: string, offset: number, limit: number) => Promise<Array<{Role: string; Content: string; Type: string}>>
           PickDirectory: () => Promise<string>
         }
       }
@@ -68,7 +68,7 @@ export const UpdateSettings   = (cfg: any) => app().UpdateSettings(cfg)
 export const GetHooksConfig   = () => app().GetHooksConfig()
 export const SaveHooksConfig  = (cfg: any) => app().SaveHooksConfig(cfg)
 export const OpenInTerminal   = (workdir: string, sessionId: string, binPath: string) => app().OpenInTerminal(workdir, sessionId, binPath)
-export const GetSessionMessages = (id: string, workdir: string) => app().GetSessionMessages(id, workdir)
+export const GetSessionMessages = (id: string, workdir: string, offset: number, limit: number) => app().GetSessionMessages(id, workdir, offset, limit)
 export const PickDirectory     = () => app().PickDirectory()
 
 // runtime helpers

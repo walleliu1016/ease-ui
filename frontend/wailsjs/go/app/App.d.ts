@@ -14,7 +14,7 @@ export function CreateSession(arg1:string,arg2:string):Promise<string>;
 
 export function GetHooksConfig():Promise<app.HooksConfig>;
 
-export function GetSessionMessages(arg1:string,arg2:string):Promise<Array<jsonl.Message>>;
+export function GetSessionMessages(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<jsonl.Message>>;
 
 export function GetSettings():Promise<settings.Config>;
 
