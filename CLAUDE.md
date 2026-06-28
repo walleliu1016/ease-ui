@@ -77,15 +77,23 @@ export PATH=$PATH:~/go/bin
 
 ```
 ease-ui/
+├── main.go              # 单例锁 → app.New → wails.Run
+├── app.go               # Wails 配置 + OnStartup/OnShutdown + Bind
 ├── internal/app/        # 唯一 Wails binding 层，加方法就改这里 + app.go 的 Bind
-├── internal/<pkg>/      # 业务包；加新包时同步在 internal/app 里组合
+├── internal/jsonl/      # 读 ~/.claude/projects/*.jsonl + WatchProjects() 自动刷新
+├── internal/hookserver/ # 内置 HTTP server 收 Claude hooks + 配 ~/.claude/settings.json
+├── internal/instance/   # ~/.ease-app/instance.json 会话状态持久化（30s 防抖写盘）
+├── internal/single/     # flock (Unix) / LockFileEx (Windows) 单例锁
+├── internal/terminal/   # 跨平台唤起系统终端（mac iTerm2/Terminal.app、win wt/cmd、linux gnome/konsole/xterm）
+├── internal/<其他>/     # auth / process / protocol / session / settings / hooks / events / log
 ├── frontend/src/
 │   ├── main.ts          # 启动入口，改这里小心 —— 早期 diag 脚本依赖执行顺序
 │   ├── preload.ts       # 模块求值最早一行，**不要** import 任何东西（它要第一个 log）
-│   ├── composables/     # useWails（IPC 转发）+ useEventStream（事件订阅）
-│   ├── stores/          # Pinia，每文件一个 store
+│   ├── composables/     # useWails（IPC 转发）+ useEventStream（事件订阅，含 sessions:list:changed）
+│   ├── stores/          # Pinia，每文件一个 store；sessions 里 formatContent 镜像 Go 端 ContentText()
 │   ├── views/           # 路由组件
 │   ├── components/      # 复用 UI
+│   ├── styles/          # reset.css + theme.css（CSS 变量，dark-pro/light-pro 双主题）
 │   └── wailsjs/         # 自动生成，**不要手改**
 └── docs/superpowers/    # 设计文档 + 实施计划
 ```
@@ -115,6 +123,16 @@ var assets embed.FS
 | macOS | WKWebView | TCC 权限（见下） |
 | Windows | WebView2 | Win11 自带，Win10 要装 runtime；高 DPI 缩放有 bug |
 | Linux | WebKitGTK | 需要 `libwebkit2gtk-4.0-dev` + `libgtk-3-dev`；headless 环境跑不了 |
+
+### 单例锁 + `wails dev` 的 trade-off
+
+`internal/single` 在 main.go 启动时就抢 flock。**意味着 `wails dev` 的 hot-reload 会失败**：每次 rebuild 都要拉起新进程，新进程抢不到锁，dev server 报 `ease-ui 已在运行` 然后保留旧版。
+
+**开发流程**：
+1. 改完 Go 代码 → cmd+Q 退出当前 app → dev server 自动 rebuild + 重启
+2. 不想打断 dev session：用 prod binary 测（`wails build && open build/bin/...`）
+
+如果 hot-reload 体验差到影响效率，可以临时把 `app.go` 里的 `single.Acquire()` 注释掉（仅 dev）。**别提交这种临时改动。**
 
 ---
 
@@ -201,9 +219,10 @@ tccutil reset Accessibility
 ## 已知坑（v1 未解决）
 
 1. **生产 build 黑屏**：dev 模式 OK，prod 偶现 WebView 不渲染。workaround：`wails dev` 或加 `-devtools` 复现。
-2. **macOS 首次 `ease-ui init` 弹"终端想控制"** —— Terminal/iTerm TCC 授权。无功能影响。
+2. **首次唤起 Terminal / iTerm 弹 TCC** —— Terminal/iTerm TCC 授权。无功能影响，烦人。
 3. **v1 不支持代理** —— CLI 子进程直连。
 4. **v1 单 session 不并发** —— streaming 时 composer 锁住。
+5. **wails dev hot-reload 受单例锁拖累** —— 见上面"单例锁 + wails dev 的 trade-off"小节。
 
 详细见 `README.md` 调试技巧 + 已知问题。
 
@@ -216,6 +235,10 @@ tccutil reset Accessibility
 - **别在 `internal/app` 之外的包 import Wails** —— 保持 binding 层单点。
 - **改 binding 必须重新跑 Wails build** —— 否则 `wailsjs/go/app/App.js` 是旧的。
 - **任何 `os/exec` 调用都要带 context** —— `cmd.Run()` 没法取消，`exec.CommandContext(ctx, ...)` 才行。
+- **路径有两套**：`~/.ease-app/` 存 auth/settings/instance/logs（用 `os.UserHomeDir`）；`~/Library/Application Support/ease-ui/` 存单例锁（用 `os.UserConfigDir`，per-user 唯一性）。**别混**，前者随用户走，后者跟系统配置。
+- **fsnotify watcher 启动失败不要 panic** —— `App.startWatcher()` 出错时静默 return，主流程照常；用户可能没 `~/.claude/projects` 目录。
+- **Pinia ref<Record<K, V>> 的更新要用 spread 整体替换** —— `state.value = { ...state.value, [id]: v }`，不要 `state.value[id] = v`，否则 Vue 不会触发响应。
+- **前端 `formatContent` 必须和 Go 端 `ContentBlock.ContentText()` 保持同步** —— 改一边要同时改另一边。两者功能等价，前端做展示格式化，Go 做 binding 字段（如果将来要加 `Text` 字段的话）。
 
 ---
 

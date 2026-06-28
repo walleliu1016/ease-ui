@@ -3,6 +3,7 @@ package jsonl
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -11,6 +12,20 @@ type Message struct {
 	Role    string          `json:"role"`
 	Content json.RawMessage `json:"content"`
 	Type    string          `json:"type"`
+}
+
+// contentBlock 覆盖 Claude API 已知的所有 content 类型。
+// 未知字段（text/thinking/input/content/is_error）保留以便排错。
+type contentBlock struct {
+	Type     string          `json:"type"`
+	Text     string          `json:"text"`
+	Thinking string          `json:"thinking"`
+	Name     string          `json:"name"`
+	Input    json.RawMessage `json:"input"`
+	// tool_result
+	ToolUseID string          `json:"tool_use_id"`
+	Result    json.RawMessage `json:"content"`
+	IsError   bool            `json:"is_error"`
 }
 
 // ContentText extracts readable text from content, which may be a plain
@@ -26,31 +41,138 @@ func (m Message) ContentText() string {
 	if json.Unmarshal(m.Content, &blocks) != nil {
 		return string(m.Content) // fallback: raw JSON
 	}
-	var parts []string
+	parts := make([]string, 0, len(blocks))
 	for _, b := range blocks {
-		switch b.Type {
-		case "text":
-			if b.Text != "" {
-				parts = append(parts, b.Text)
-			}
-		case "thinking":
-			if b.Thinking != "" {
-				parts = append(parts, "> "+b.Thinking)
-			}
-		case "tool_use":
-			if b.Name != "" {
-				parts = append(parts, "> 🔧 **"+b.Name+"**")
-			}
+		if line := formatBlock(b); line != "" {
+			parts = append(parts, line)
 		}
 	}
 	return strings.Join(parts, "\n\n")
 }
 
-type contentBlock struct {
-	Type     string `json:"type"`
-	Text     string `json:"text"`
-	Thinking string `json:"thinking"`
-	Name     string `json:"name"`
+// formatBlock 把单个 content block 渲染成 markdown 友好的一行（或一块）。
+func formatBlock(b contentBlock) string {
+	switch b.Type {
+	case "text":
+		return b.Text
+	case "thinking":
+		if b.Thinking == "" {
+			return ""
+		}
+		return "> 💭 " + b.Thinking
+	case "tool_use":
+		return formatToolUse(b.Name, b.Input)
+	case "tool_result":
+		return formatToolResult(b.Result, b.IsError)
+	}
+	return ""
+}
+
+// formatToolUse 渲染工具调用：🔧 **Name** + 关键参数。
+// 已知工具挑关键字段展示；未知工具把 input 整个 JSON 摊开。
+func formatToolUse(name string, input json.RawMessage) string {
+	if name == "" {
+		return ""
+	}
+	// 解析 input 为通用 map
+	var args map[string]any
+	if len(input) > 0 {
+		_ = json.Unmarshal(input, &args)
+	}
+	var keyArg string
+	switch name {
+	case "Bash":
+		if cmd, ok := args["command"].(string); ok {
+			keyArg = "`" + truncate(cmd, 200) + "`"
+		}
+	case "Read", "Write", "Edit", "MultiEdit":
+		if fp, ok := args["file_path"].(string); ok {
+			keyArg = "`" + fp + "`"
+		}
+	case "Glob":
+		if pat, ok := args["pattern"].(string); ok {
+			keyArg = "`" + truncate(pat, 200) + "`"
+		}
+	case "Grep":
+		if pat, ok := args["pattern"].(string); ok {
+			path, _ := args["path"].(string)
+			if path != "" {
+				keyArg = "`" + truncate(pat, 100) + "` in `" + path + "`"
+			} else {
+				keyArg = "`" + truncate(pat, 200) + "`"
+			}
+		}
+	case "Skill":
+		if sk, ok := args["skill"].(string); ok {
+			keyArg = "`" + sk + "`"
+		}
+	case "WebFetch":
+		if u, ok := args["url"].(string); ok {
+			keyArg = truncate(u, 200)
+		}
+	case "WebSearch":
+		if q, ok := args["query"].(string); ok {
+			keyArg = truncate(q, 200)
+		}
+	case "TodoWrite":
+		// 不展开，只显示名字
+	default:
+		// 未知工具：把 input 整个 JSON 当作 keyArg
+		if len(input) > 0 && string(input) != "null" && string(input) != "{}" {
+			keyArg = "`" + truncate(string(input), 200) + "`"
+		}
+	}
+	if keyArg == "" {
+		return "🔧 **" + name + "**"
+	}
+	return "🔧 **" + name + "** " + keyArg
+}
+
+// formatToolResult 渲染工具结果：直接显示 content（truncate）。
+// content 可能是字符串、也可能是 [{type:text,text:...}, ...] 数组。
+func formatToolResult(raw json.RawMessage, isError bool) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	// 字符串
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		body := strings.TrimRight(s, "\n")
+		body = truncate(body, 1500)
+		if isError {
+			return "⚠️ " + body
+		}
+		return "📤 " + body
+	}
+	// 数组（text blocks）
+	var blocks []contentBlock
+	if json.Unmarshal(raw, &blocks) == nil {
+		var parts []string
+		for _, b := range blocks {
+			if b.Type == "text" && b.Text != "" {
+				parts = append(parts, b.Text)
+			}
+		}
+		body := strings.TrimRight(strings.Join(parts, "\n"), "\n")
+		body = truncate(body, 1500)
+		if isError {
+			return "⚠️ " + body
+		}
+		return "📤 " + body
+	}
+	// fallback：原样
+	body := truncate(string(raw), 1500)
+	if isError {
+		return "⚠️ " + body
+	}
+	return "📤 " + body
+}
+
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + fmt.Sprintf("…(+%d)", len(s)-max)
 }
 
 type rawLine struct {

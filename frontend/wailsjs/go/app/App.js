@@ -94,6 +94,10 @@ export function SetPassword(arg1) {
   return window['go']['app']['App']['SetPassword'](arg1);
 }
 
+export function Shutdown() {
+  return window['go']['app']['App']['Shutdown']();
+}
+
 export function UpdateSettings(arg1) {
   return window['go']['app']['App']['UpdateSettings'](arg1);
 }

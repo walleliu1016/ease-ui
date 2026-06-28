@@ -48,6 +48,9 @@ func runApp() error {
 			a.EnsureHookServer()
 			wailsruntime.LogInfo(ctx, "ease-ui starting, version "+version)
 		},
+		OnShutdown: func(ctx context.Context) {
+			a.Shutdown()
+		},
 		Bind: []interface{}{ a },
 	})
 	return err

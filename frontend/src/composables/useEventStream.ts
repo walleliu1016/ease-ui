@@ -16,6 +16,11 @@ export function useEventStream() {
       console.error('[fatal]', msg)
     }))
 
+    // 后端 fsnotify 监听 jsonl 变化后推送；触发列表刷新
+    cleanups.push(EventsOn('sessions:list:changed', () => {
+      void sessions.refresh()
+    }))
+
     watch(
       () => sessions.activeId,
       (newId, oldId) => {

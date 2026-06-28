@@ -52,6 +52,8 @@ export function SetContext(arg1:context.Context):Promise<void>;
 
 export function SetPassword(arg1:string):Promise<void>;
 
+export function Shutdown():Promise<void>;
+
 export function UpdateSettings(arg1:settings.Config):Promise<void>;
 
 export function Verify(arg1:string):Promise<void>;

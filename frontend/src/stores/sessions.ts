@@ -10,17 +10,10 @@ export interface PendingPerm {
 }
 
 // 解析 Claude API content block，提取文本拼成 markdown。
+// 与 internal/jsonl/parser.go 保持同步。
 function formatContent(raw: any): string {
   if (Array.isArray(raw)) {
-    return raw
-      .map((b: any) => {
-        if (b.type === 'text' && b.text) return b.text
-        if (b.type === 'thinking' && b.thinking) return `> ${b.thinking}`
-        if (b.type === 'tool_use') return `> 🔧 **${b.name}**`
-        return ''
-      })
-      .filter(Boolean)
-      .join('\n\n')
+    return raw.map(formatBlock).filter(Boolean).join('\n\n')
   }
   if (typeof raw === 'string') {
     try {
@@ -30,6 +23,84 @@ function formatContent(raw: any): string {
     return raw
   }
   return String(raw || '')
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s
+  return s.slice(0, max) + `…(+${s.length - max})`
+}
+
+function formatToolUse(name: string, input: any): string {
+  if (!name) return ''
+  const args = (input && typeof input === 'object') ? input : {}
+  let keyArg = ''
+  switch (name) {
+    case 'Bash':
+      if (typeof args.command === 'string') keyArg = `\`${truncate(args.command, 200)}\``
+      break
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+    case 'MultiEdit':
+      if (typeof args.file_path === 'string') keyArg = `\`${args.file_path}\``
+      break
+    case 'Glob':
+      if (typeof args.pattern === 'string') keyArg = `\`${truncate(args.pattern, 200)}\``
+      break
+    case 'Grep':
+      if (typeof args.pattern === 'string') {
+        const p = truncate(args.pattern, 100)
+        keyArg = args.path ? `\`${p}\` in \`${args.path}\`` : `\`${truncate(args.pattern, 200)}\``
+      }
+      break
+    case 'Skill':
+      if (typeof args.skill === 'string') keyArg = `\`${args.skill}\``
+      break
+    case 'WebFetch':
+      if (typeof args.url === 'string') keyArg = truncate(args.url, 200)
+      break
+    case 'WebSearch':
+      if (typeof args.query === 'string') keyArg = truncate(args.query, 200)
+      break
+    default: {
+      // 未知工具：把 input 整个 JSON 摊开
+      const s = JSON.stringify(args)
+      if (s && s !== 'null' && s !== '{}') keyArg = `\`${truncate(s, 200)}\``
+    }
+  }
+  return keyArg ? `🔧 **${name}** ${keyArg}` : `🔧 **${name}**`
+}
+
+function formatToolResult(raw: any, isError: boolean): string {
+  if (raw == null) return ''
+  const prefix = isError ? '⚠️ ' : '📤 '
+  if (typeof raw === 'string') {
+    return prefix + truncate(raw.replace(/\n+$/, ''), 1500)
+  }
+  if (Array.isArray(raw)) {
+    const parts: string[] = []
+    for (const b of raw) {
+      if (b && b.type === 'text' && typeof b.text === 'string') parts.push(b.text)
+    }
+    return prefix + truncate(parts.join('\n').replace(/\n+$/, ''), 1500)
+  }
+  return prefix + truncate(String(raw), 1500)
+}
+
+function formatBlock(b: any): string {
+  if (!b || typeof b !== 'object') return ''
+  switch (b.type) {
+    case 'text':
+      return typeof b.text === 'string' ? b.text : ''
+    case 'thinking':
+      return b.thinking ? `> 💭 ${b.thinking}` : ''
+    case 'tool_use':
+      return formatToolUse(b.name, b.input)
+    case 'tool_result':
+      return formatToolResult(b.content, !!b.is_error)
+    default:
+      return ''
+  }
 }
 
 const PAGE_SIZE = 100
