@@ -6,6 +6,46 @@ import (
 	"sync"
 )
 
+// Owner 表示当前 session 由哪一侧持有写权限。
+type Owner int
+
+const (
+	// OwnerApp 表示 Ease UI 持有 stdin，写权限在 app 端 (stream-json 模式)。
+	OwnerApp Owner = iota
+	// OwnerTerminal 表示写权限在外部终端 (claude -r 在 iTerm/Terminal 里跑)。
+	OwnerTerminal
+)
+
+func (o Owner) String() string {
+	switch o {
+	case OwnerApp:
+		return "app"
+	case OwnerTerminal:
+		return "terminal"
+	}
+	return "unknown"
+}
+
+// Mode 表示当前 claude 进程的启动模式。
+type Mode int
+
+const (
+	// ModeStream 对应 `claude --input-format stream-json --output-format stream-json`。
+	ModeStream Mode = iota
+	// ModeResume 对应 `claude -r <sid>`，运行在外部终端。
+	ModeResume
+)
+
+func (m Mode) String() string {
+	switch m {
+	case ModeStream:
+		return "stream"
+	case ModeResume:
+		return "resume"
+	}
+	return "unknown"
+}
+
 type ProcessIface interface {
 	Write(s string) error
 	Close() error
@@ -21,6 +61,11 @@ type Session struct {
 	ID      string
 	WorkDir string
 
+	owner      Owner
+	mode       Mode
+	extPID     int
+	extPIDFile string
+
 	mu      sync.Mutex
 	state   State
 	proc    ProcessIface
@@ -31,12 +76,17 @@ type Session struct {
 	// while a Write was in flight, so a failed Write can roll back only when
 	// it would not clobber a legitimate concurrent change.
 	version uint64
+	// switchMu 串行化 owner 切换流程 (kill 外部 claude → 起 stream-json)，
+	// 与 mu 分离避免与高频状态读写 (Send/RegisterPermission) 互锁。
+	switchMu sync.Mutex
 }
 
 func New(id, workDir string) *Session {
 	return &Session{
 		ID:      id,
 		WorkDir: workDir,
+		owner:   OwnerApp,
+		mode:    ModeStream,
 		state:   StateIdle,
 		pending: map[string]struct{}{},
 	}
@@ -61,6 +111,59 @@ func (s *Session) setProcess(p ProcessIface) {
 	s.proc = p
 	s.version++
 }
+
+// Owner 返回当前 session 的写权限归属。
+func (s *Session) Owner() Owner {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.owner
+}
+
+// SetOwner 更新 session 的写权限归属。调用方应保证状态一致性
+// （如先关掉旧 owner 对应的进程，再 SetOwner）。
+func (s *Session) SetOwner(o Owner) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.owner = o
+	s.version++
+}
+
+// Mode 返回当前 claude 进程的启动模式。
+func (s *Session) Mode() Mode {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mode
+}
+
+// SetMode 更新 claude 进程的启动模式。
+func (s *Session) SetMode(m Mode) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mode = m
+	s.version++
+}
+
+// SetExtPID 记录 owner=Terminal 时的外部 claude 进程 pid 和 pidfile 路径，
+// 供切回 App 时定位并 kill 该进程。pid <= 0 表示清空。
+func (s *Session) SetExtPID(pid int, pidFile string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.extPID = pid
+	s.extPIDFile = pidFile
+	s.version++
+}
+
+// ExtPID 返回 owner=Terminal 时记录的外部 claude 进程 (pid, pidfile)。
+func (s *Session) ExtPID() (int, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.extPID, s.extPIDFile
+}
+
+// SwitchLock 返回切换 owner 时使用的互斥锁。app 层的 SwitchOwner 在
+// kill 外部 / 起新进程的整段流程内持锁，避免与 Send/RespondPermission
+// 抢同一把锁造成长时间阻塞。
+func (s *Session) SwitchLock() *sync.Mutex { return &s.switchMu }
 
 // Send delivers a prompt to the underlying process. Valid only in Idle or Running.
 // Idle -> Running. In AwaitingPermission, returns ErrAwaitingPermission.
