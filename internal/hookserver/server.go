@@ -5,18 +5,32 @@ package hookserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
 
 // HookEvent is the payload POSTed by Claude hooks to /hook.
+// Claude CLI 通过 command hook 的 stdin 传入 JSON。
+// 字段名是 hook_event_name（不是 type），与 HTTP hook 的 payload 格式不同。
 type HookEvent struct {
-	SessionID string `json:"session_id"`
-	Type      string `json:"type"`      // SessionStart, SessionEnd, PreToolUse, …
-	HookName  string `json:"hook_name"` // which hook triggered (e.g. "PreToolUse")
-	Tool      string `json:"tool"`      // tool name (for tool hooks)
+	SessionID     string `json:"session_id"`
+	HookEventName string `json:"hook_event_name"` // SessionStart, SessionEnd, PreToolUse, …
+	HookName      string `json:"hook_name"`
+	Tool          string `json:"tool"`
+	// 兼容 HTTP hook 格式
+	Type string `json:"type,omitempty"`
+}
+
+// EventType 返回 hook 事件类型，兼容 command 和 HTTP 两种格式。
+func (e HookEvent) EventType() string {
+	if e.HookEventName != "" {
+		return e.HookEventName
+	}
+	return e.Type
 }
 
 // SendRequest is the payload for POST /api/send.
@@ -79,15 +93,18 @@ func (s *Server) LastSeen(sessionID string) time.Time {
 }
 
 func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(os.Stderr, "[DBG] hookserver: HTTP %s %s\n", r.Method, r.URL.Path)
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var evt HookEvent
 	if err := json.NewDecoder(r.Body).Decode(&evt); err != nil {
+		fmt.Fprintf(os.Stderr, "[DBG] hookserver: parse error: %v\n", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	fmt.Fprintf(os.Stderr, "[DBG] hookserver: parsed type=%s sid=%s\n", evt.Type, evt.SessionID)
 
 	now := time.Now()
 	s.mu.Lock()
@@ -107,7 +124,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 		SuppressOutput bool `json:"suppressOutput,omitempty"`
 	}
 	resp := hookResponse{Continue: true}
-	if evt.Type == "SessionStart" {
+	if evt.EventType() == "SessionStart" {
 		resp.SuppressOutput = true
 	}
 	w.Header().Set("Content-Type", "application/json")

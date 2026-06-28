@@ -91,8 +91,10 @@ func (a *App) CreateSession(workDir, prompt string) (string, error) {
 	a.registerPending(ch)
 	defer a.unregisterPending(ch)
 
+	fmt.Fprintf(os.Stderr, "[DBG] CreateSession: waiting for SessionStart hook (15s timeout)...\n")
 	select {
 	case realID := <-ch:
+		fmt.Fprintf(os.Stderr, "[DBG] CreateSession: GOT real id=%s\n", realID)
 		s := session.New(realID, workDir)
 		s.SetProcessForTest(proc)
 		a.registerSession(s)
@@ -101,9 +103,9 @@ func (a *App) CreateSession(workDir, prompt string) (string, error) {
 		if prompt != "" {
 			_ = s.Send(prompt)
 		}
-		fmt.Fprintf(os.Stderr, "[DBG] CreateSession: got real id %s\n", realID)
 		return realID, nil
 	case <-time.After(15 * time.Second):
+		fmt.Fprintf(os.Stderr, "[DBG] CreateSession: TIMEOUT after 15s\n")
 		proc.Close()
 		return "", fmt.Errorf("session start timeout (15s)")
 	}

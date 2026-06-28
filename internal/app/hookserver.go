@@ -35,14 +35,18 @@ func (a *App) EnsureHookServer() {
 
 	// 收到 hook 事件 → 通知前端 + 持久化到 instance.json
 	a.hookSrv.OnEvent(func(evt hookserver.HookEvent) {
+		tp := evt.EventType()
+		fmt.Fprintf(os.Stderr, "[DBG] hookserver event: type=%s sid=%s hook=%s tool=%s\n",
+			tp, evt.SessionID, evt.HookName, evt.Tool)
 		if a.ctx != nil && evt.SessionID != "" {
 			// SessionStart：Claude 返回真实 UUID，通知等待中的 CreateSession
-			if evt.Type == "SessionStart" {
+			if tp == "SessionStart" {
+				fmt.Fprintf(os.Stderr, "[DBG] hookserver: delivering SessionStart id=%s\n", evt.SessionID)
 				deliverSessionID(evt.SessionID)
 			}
 			payload, _ := json.Marshal(evt)
 			wailsruntime.EventsEmit(a.ctx, "hook:"+evt.SessionID, string(payload))
-			if evt.Type == "SessionEnd" {
+			if tp == "SessionEnd" {
 				a.inst.Put(evt.SessionID, "done")
 			} else {
 				a.inst.Put(evt.SessionID, "running")

@@ -142,13 +142,17 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   async function create(workdir: string, prompt: string) {
-    const id = await CreateSession(workdir, prompt)
-    // CreateSession 后 Go 端已在 a.sessions map 注册，标记 adopted
-    // 避免 send() 重复走 AdoptSession 路径
+    const id = await CreateSession(workdir, prompt) // 阻塞等 hook，最多 15s
     adopted.value = { ...adopted.value, [id]: true }
     owner.value = { ...owner.value, [id]: 'app' }
     mode.value  = { ...mode.value,  [id]: 'stream' }
-    await refresh()
+    // 占位插入：jsonl 尚未写入，先显示空白项，等 sessions:list:changed 刷新
+    if (!list.value.find(s => s.id === id)) {
+      list.value = [...list.value, {
+        id, workdir, mtime: Date.now(), msg_count: 0,
+        first_prompt: prompt, ai_title: '', size: 0,
+      }]
+    }
     activeId.value = id
     return id
   }
@@ -315,7 +319,14 @@ export const useSessionsStore = defineStore('sessions', () => {
   function handleHookEvent(sid: string, line: string) {
     let evt: any
     try { evt = JSON.parse(line) } catch { return }
-    switch (evt.type) {
+    // command hook 用 hook_event_name，HTTP hook 用 type
+    const tp = evt.hook_event_name || evt.type
+    switch (tp) {
+      case 'SessionStart':
+        // 外部终端启动了 claude -r，标记 owner=terminal
+        owner.value = { ...owner.value, [sid]: 'terminal' }
+        mode.value  = { ...mode.value,  [sid]: 'resume' }
+        break
       case 'SessionEnd':
         state.value = { ...state.value, [sid]: 'done' }
         // owner 仍标记为 terminal（外部 claude 退出，但下一次 send 仍会
