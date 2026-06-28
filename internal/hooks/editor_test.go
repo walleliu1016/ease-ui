@@ -16,18 +16,27 @@ func TestEditor_LoadMissingReturnsEmpty(t *testing.T) {
 	e := NewEditor()
 	cfg, err := e.Load()
 	require.NoError(t, err)
-	assert.Empty(t, cfg.PreToolUse)
+	assert.Nil(t, cfg.Hooks)
 }
 
 func TestEditor_SaveCreatesBackup(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
-	require.NoError(t, os.WriteFile(path, []byte(`{"PreToolUse":[]}`), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte(`{"hooks":{"PreToolUse":[]}}`), 0o644))
 
 	SetPath(path)
 	e := NewEditor()
-	cfg := &Config{}
-	cfg.PreToolUse = []Hook{{Command: "echo hi", Type: HookTypeShell}}
+	cfg := &Config{
+		Hooks: map[string]any{
+			"PreToolUse": []any{
+				map[string]any{
+					"hooks": []any{
+						map[string]any{"type": "command", "command": "echo hi"},
+					},
+				},
+			},
+		},
+	}
 	require.NoError(t, e.Save(cfg))
 
 	_, err := os.Stat(path + ".bak")
@@ -37,14 +46,20 @@ func TestEditor_SaveCreatesBackup(t *testing.T) {
 func TestEditor_SavePreservesUnknownFields(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
-	original := `{"theme":"dark","PreToolUse":[{"command":"x","type":"shell"}]}`
+	original := `{"theme":"dark","hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"x"}]}]}}`
 	require.NoError(t, os.WriteFile(path, []byte(original), 0o644))
 
 	SetPath(path)
 	e := NewEditor()
 	cfg, err := e.Load()
 	require.NoError(t, err)
-	cfg.PostToolUse = []Hook{{Command: "y", Type: HookTypeShell}}
+	cfg.Hooks["PostToolUse"] = []any{
+		map[string]any{
+			"hooks": []any{
+				map[string]any{"type": "command", "command": "y"},
+			},
+		},
+	}
 	require.NoError(t, e.Save(cfg))
 
 	data, err := os.ReadFile(path)
@@ -59,8 +74,17 @@ func TestEditor_SaveIsAtomic(t *testing.T) {
 
 	SetPath(path)
 	e := NewEditor()
-	cfg := &Config{}
-	cfg.PreToolUse = []Hook{{Command: "ls", Type: HookTypeShell}}
+	cfg := &Config{
+		Hooks: map[string]any{
+			"PreToolUse": []any{
+				map[string]any{
+					"hooks": []any{
+						map[string]any{"type": "command", "command": "ls"},
+					},
+				},
+			},
+		},
+	}
 	require.NoError(t, e.Save(cfg))
 
 	_, err := os.Stat(path + ".tmp")

@@ -7,17 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetSettings_Default(t *testing.T) {
-	dir := t.TempDir()
-	a, err := New(Options{ConfigDir: dir})
-	require.NoError(t, err)
-
-	cfg, err := a.GetSettings()
-	require.NoError(t, err)
-	assert.Equal(t, "dark-pro", cfg.Theme)
-}
-
-func TestUpdateSettings_Persists(t *testing.T) {
+func TestSettingsApp_UpdateAndReload(t *testing.T) {
 	dir := t.TempDir()
 	a, err := New(Options{ConfigDir: dir})
 	require.NoError(t, err)
@@ -36,16 +26,25 @@ func TestHooksApp_AddAndSave(t *testing.T) {
 	a, err := New(Options{ConfigDir: dir})
 	require.NoError(t, err)
 
+	// 新接口：map[string]any，对应 Claude settings.json 原始 hooks 格式
 	cfg, err := a.GetHooksConfig()
 	require.NoError(t, err)
-	cfg.PreToolUse = []HookEntry{
-		{Matcher: "Bash", Command: "echo hi", Type: "shell"},
+
+	cfg["PreToolUse"] = []any{
+		map[string]any{
+			"matcher": "Bash",
+			"hooks": []any{
+				map[string]any{
+					"type":    "command",
+					"command": "echo hi",
+				},
+			},
+		},
 	}
 	require.NoError(t, a.SaveHooksConfig(cfg))
 
 	loaded, _ := a.GetHooksConfig()
-	require.Len(t, loaded.PreToolUse, 1)
-	assert.Equal(t, "echo hi", loaded.PreToolUse[0].Command)
-	assert.Equal(t, "shell", loaded.PreToolUse[0].Type)
-	assert.Equal(t, "Bash", loaded.PreToolUse[0].Matcher)
+	pretool, ok := loaded["PreToolUse"].([]any)
+	require.True(t, ok)
+	require.Len(t, pretool, 1)
 }

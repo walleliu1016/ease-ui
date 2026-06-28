@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { HooksConfig } from '../types/hooks'
 import { GetHooksConfig, SaveHooksConfig } from '../composables/useWails'
 
 export const useHooksStore = defineStore('hooks', () => {
-  const cfg = ref<HooksConfig | null>(null)
+  const cfg = ref<Record<string, any> | null>(null)
   const dirty = ref(false)
 
   async function load() {
