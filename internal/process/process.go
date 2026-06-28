@@ -25,7 +25,10 @@ type Process struct {
 // (caller is responsible for protocol.Parse).
 //
 // If binPath is empty, "claude" is used and the standard Claude CLI flags
-// (--cwd, --session-id, --output-format stream-json, --verbose) are appended.
+// (-p --session-id --input-format stream-json --output-format stream-json
+// --verbose) are appended. workDir is set via cmd.Dir (Claude CLI 没有
+// --cwd flag，--cwd 是无效 option 会导致进程立即报错退出）。
+// -p/--print 是 stream-json 的前提：Input format (only works with --print)。
 // If binPath is an explicit path (e.g. /bin/cat in tests), no flags are added
 // so the helper binary is invoked as-is.
 func Start(workDir, sessionID, binPath string) (*Process, error) {
@@ -33,7 +36,7 @@ func Start(workDir, sessionID, binPath string) (*Process, error) {
 	if binPath == "" {
 		binPath = "claude"
 		args = []string{
-			"--cwd", workDir,
+			"-p",
 			"--session-id", sessionID,
 			"--input-format", "stream-json",
 			"--output-format", "stream-json",

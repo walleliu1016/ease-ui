@@ -240,7 +240,7 @@ tccutil reset Accessibility
 - **Pinia ref<Record<K, V>> 的更新要用 spread 整体替换** —— `state.value = { ...state.value, [id]: v }`，不要 `state.value[id] = v`，否则 Vue 不会触发响应。
 - **前端 `formatContent` 必须和 Go 端 `ContentBlock.ContentText()` 保持同步** —— 改一边要同时改另一边。两者功能等价，前端做展示格式化，Go 做 binding 字段（如果将来要加 `Text` 字段的话）。
 - **Owner 切换（`SwitchOwner`）走 `session.SwitchLock()`，不抢 `Send/RespondPermission` 用的 `mu`** —— 避免切换时阻塞 prompt 写入；切换期间其他 Send 会被 short-block，500ms 内完成。
-- **stream-json envelope vs 裸文本**：`Send` 走 v1 裸文本路径（Claude 兼容接受）；`SwitchOwner` 起新进程时写 envelope `{"type":"user","message":{...}}` 严格对齐。**别**把 `Send` 改成 envelope（v1 用户/历史 session 会断）。
+- **stream-json 写入必须用 envelope**：`Send` 写 `{"type":"user","message":{"role":"user","content":prompt}}\n`（`session.envelopeUserMessage`）。Claude CLI stream-json 模式只接受 envelope 格式，**裸文本会被解析器直接丢弃**——这是 v1 "Send 写完没反应" 的根因。`SwitchOwner` 起新进程 + `session.Send` 都走同一份 envelope 生成逻辑。
 
 ---
 

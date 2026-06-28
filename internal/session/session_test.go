@@ -40,7 +40,9 @@ func TestSession_SendRequiresRunningOrIdle(t *testing.T) {
 
 	require.NoError(t, s.Send("hi"))
 	assert.Equal(t, StateRunning, s.State())
-	assert.Equal(t, []string{"hi\n"}, fp.written)
+	// Send 现在包成 stream-json envelope（嵌套 map 按 Go 编码顺序：type 在外层最后），
+	// 替代之前的裸文本。Claude CLI 只接受 envelope 格式。
+	assert.Equal(t, []string{`{"message":{"content":"hi","role":"user"},"type":"user"}` + "\n"}, fp.written)
 }
 
 func TestSession_RespondPermission(t *testing.T) {

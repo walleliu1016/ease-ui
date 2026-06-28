@@ -2,6 +2,7 @@
 package session
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 )
@@ -191,7 +192,7 @@ func (s *Session) Send(prompt string) error {
 	s.version++
 	s.mu.Unlock()
 
-	if err := proc.Write(prompt + "\n"); err != nil {
+	if err := proc.Write(envelopeUserMessage(prompt)); err != nil {
 		s.mu.Lock()
 		if s.version == prevVersion+1 {
 			// No concurrent mutation observed; safe to roll back.
@@ -299,3 +300,18 @@ func (s *Session) GetProcessForTest() ProcessIface {
 
 // UnlockIfLocked / Locked helpers used by tests; keep tiny
 func (s *Session) UnlockIfLocked() {}
+
+// envelopeUserMessage 把 prompt 包成 stream-json user message envelope。
+// 跟 Claude CLI stream-json 协议严格对齐：每行一个 JSON 对象 + \n 终止。
+// claude 进程只接受这种格式；裸文本会被 stream-json 解析器直接丢弃，
+// 这就是 v1 "Send 写完但没反应" 的根因。
+func envelopeUserMessage(prompt string) string {
+	body, _ := json.Marshal(map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role":    "user",
+			"content": prompt,
+		},
+	})
+	return string(body) + "\n"
+}
