@@ -347,7 +347,8 @@ export const useSessionsStore = defineStore('sessions', () => {
         break
       }
       case 'tool_use': {
-        // 旧 stream-event 类型，blocks 通常已包含在 assistant/user message 里
+        // 新版 stream-json 也会把 tool_use 作为独立事件发出
+        state.value = { ...state.value, [sid]: 'running_tool' }
         break
       }
       case 'tool_result': {
