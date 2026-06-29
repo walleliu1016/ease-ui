@@ -6,18 +6,33 @@
     </div>
     <div class="titlebar-right">
       <button class="win-btn" @click="$emit('minimize')" title="最小化">─</button>
-      <button class="win-btn" @click="$emit('maximize')" title="最大化">▢</button>
+      <button
+        class="win-btn"
+        :title="isMaximized ? '还原' : '最大化'"
+        @click="toggleMaximize"
+      >
+        {{ isMaximized ? '▣' : '▢' }}
+      </button>
       <button class="win-btn close" @click="$emit('close')" title="关闭">✕</button>
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
-defineEmits<{
+<script setup lang="ts">const props = defineProps<{ isMaximized?: boolean }>()
+const emit = defineEmits<{
   (e: 'minimize'): void
   (e: 'maximize'): void
+  (e: 'restore'): void
   (e: 'close'): void
 }>()
+
+function toggleMaximize() {
+  if (props.isMaximized) {
+    emit('restore')
+  } else {
+    emit('maximize')
+  }
+}
 </script>
 
 <style scoped>
@@ -30,6 +45,7 @@ defineEmits<{
   padding: 0 10px;
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
+  --wails-draggable: drag;
   user-select: none;
 }
 .titlebar-left, .titlebar-right {

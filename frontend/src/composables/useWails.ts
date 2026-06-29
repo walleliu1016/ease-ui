@@ -24,7 +24,7 @@ declare global {
           GetHooksConfig: () => Promise<any>
           SaveHooksConfig: (cfg: any) => Promise<void>
           OpenInTerminal: (workdir: string, sessionId: string, binPath: string) => Promise<void>
-          GetSessionMessages: (id: string, workdir: string, offset: number, limit: number) => Promise<Array<{Role: string; Content: string; Type: string}>>
+          GetSessionMessages: (id: string, workdir: string, offset: number, limit: number) => Promise<Array<{Role: string; Content: string; Type: string; Timestamp: number}>>
           PickDirectory: () => Promise<string>
           GetHookServerPort: () => Promise<number>
           CheckAndFixHooks: () => Promise<boolean>
@@ -39,7 +39,14 @@ declare global {
       EventsOn: (event: string, cb: (...args: any[]) => void) => () => void
       EventsOff: (event: string) => void
       WindowMinimise: () => void
+      WindowMaximise: () => void
+      WindowUnmaximise: () => void
       WindowToggleMaximise: () => void
+      WindowIsMaximised: () => Promise<boolean>
+      WindowSetSize: (width: number, height: number) => void
+      WindowSetMinSize: (width: number, height: number) => void
+      WindowSetMaxSize: (width: number, height: number) => void
+      WindowCenter: () => void
       Quit: () => void
     }
   }
@@ -55,6 +62,36 @@ function app() {
 function runtime() {
   if (!window.runtime) throw new Error('Wails runtime not available')
   return window.runtime
+}
+
+function delay(ms: number) { return new Promise<void>(r => setTimeout(r, ms)) }
+
+/**
+ * 安全地重置窗口尺寸约束并居中。
+ *
+ * Wails runtime 的同步调用在内部是异步提交到主线程的；如果连续调用
+ * SetMinSize / SetMaxSize / SetSize / Center，后一个调用可能基于旧的
+ * 约束/尺寸计算，导致窗口先被旧 minSize 限制、再被新 minSize 撑大，
+ * 出现分阶段放大或居中不准。这里用显式延迟把调用阶段隔开。
+ */
+export async function ResetAndResizeWindow(
+  width: number,
+  height: number,
+  minWidth: number = 0,
+  minHeight: number = 0,
+  maxWidth: number = 0,
+  maxHeight: number = 0
+) {
+  const rt = runtime()
+  rt.WindowSetMinSize(0, 0)
+  rt.WindowSetMaxSize(0, 0)
+  await delay(60)
+  rt.WindowSetSize(width, height)
+  await delay(80)
+  if (minWidth > 0 && minHeight > 0) rt.WindowSetMinSize(minWidth, minHeight)
+  if (maxWidth > 0 && maxHeight > 0) rt.WindowSetMaxSize(maxWidth, maxHeight)
+  await delay(60)
+  rt.WindowCenter()
 }
 
 // Re-exported bindings
@@ -84,7 +121,14 @@ export const AdoptSession      = (id: string, workDir: string) => app().AdoptSes
 // runtime helpers
 export const EventsOn           = (event: string, cb: (...args: any[]) => void) => runtime().EventsOn(event, cb)
 export const WindowMinimise     = () => runtime().WindowMinimise()
+export const WindowMaximise     = () => runtime().WindowMaximise()
+export const WindowUnmaximise   = () => runtime().WindowUnmaximise()
 export const WindowToggleMaximise = () => runtime().WindowToggleMaximise()
+export const WindowIsMaximised  = () => runtime().WindowIsMaximised()
+export const WindowSetSize      = (width: number, height: number) => runtime().WindowSetSize(width, height)
+export const WindowSetMinSize   = (width: number, height: number) => runtime().WindowSetMinSize(width, height)
+export const WindowSetMaxSize   = (width: number, height: number) => runtime().WindowSetMaxSize(width, height)
+export const WindowCenter       = () => runtime().WindowCenter()
 export const WindowQuit         = () => runtime().Quit()
 
 export const isWailsDev = isDev

@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 type Message struct {
-	Role    string          `json:"role"`
-	Content json.RawMessage `json:"content"`
-	Type    string          `json:"type"`
+	Role      string          `json:"role"`
+	Content   json.RawMessage `json:"content"`
+	Type      string          `json:"type"`
+	Timestamp int64           `json:"timestamp"`
 }
 
 // contentBlock 覆盖 Claude API 已知的所有 content 类型。
@@ -175,11 +177,6 @@ func truncate(s string, max int) string {
 	return s[:max] + fmt.Sprintf("…(+%d)", len(s)-max)
 }
 
-type rawLine struct {
-	Type    string          `json:"type"`
-	Message json.RawMessage `json:"message"`
-}
-
 // IsSessionEnded reports whether the given jsonl file represents a session
 // that has already been terminated by the user (via /exit, /quit, or a normal
 // shutdown). Returns (false, nil) for empty/missing files. The detection
@@ -264,6 +261,12 @@ func ParseFileRange(path string, start, limit int) ([]Message, error) {
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 50*1024*1024)
 
+	type lineWithTs struct {
+		Type      string          `json:"type"`
+		Message   json.RawMessage `json:"message"`
+		Timestamp string          `json:"timestamp"`
+	}
+
 	for scanner.Scan() {
 		lineNum++
 		// Skip lines before start
@@ -274,7 +277,7 @@ func ParseFileRange(path string, start, limit int) ([]Message, error) {
 		if limit > 0 && len(out) >= limit {
 			break
 		}
-		var rl rawLine
+		var rl lineWithTs
 		if err := json.Unmarshal(scanner.Bytes(), &rl); err != nil {
 			continue
 		}
@@ -283,6 +286,11 @@ func ParseFileRange(path string, start, limit int) ([]Message, error) {
 			continue
 		}
 		m.Type = rl.Type
+		if rl.Timestamp != "" {
+			if t, err := time.Parse(time.RFC3339Nano, rl.Timestamp); err == nil {
+				m.Timestamp = t.UnixMilli()
+			}
+		}
 		out = append(out, m)
 	}
 	return out, scanner.Err()

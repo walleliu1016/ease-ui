@@ -125,14 +125,58 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const active = computed(() => list.value.find((s) => s.id === activeId.value) ?? null)
 
-  async function refresh() {
-    list.value = await ListSessions()
+  async function refresh(options?: { sort?: boolean }) {
+    const backend = await ListSessions()
     try {
       const states = await GetSessionStates()
       for (const [id, st] of Object.entries(states)) {
-        state.value = { ...state.value, [id]: st as SessionState }
+        // 后端持久化状态用 'running' 表示活跃，前端状态机统一成 'waiting'
+        const normalized = st === 'running' ? 'waiting' : st
+        state.value = { ...state.value, [id]: normalized as SessionState }
       }
     } catch {}
+
+    if (options?.sort !== false) {
+      list.value = backend
+      return
+    }
+
+    // 背景刷新：保持现有顺序，静默更新字段；只有新增/删除/字段变更时才操作。
+    // 这样可以避免每次 jsonl 写入都替换整个列表导致左侧会话区闪烁/跳动。
+    const existingMap = new Map(list.value.map(s => [s.id, s]))
+    const added: SessionMeta[] = []
+    const changed: SessionMeta[] = []
+    for (const s of backend) {
+      const cur = existingMap.get(s.id)
+      if (!cur) {
+        added.push(s)
+      } else if (
+        cur.workdir !== s.workdir ||
+        cur.mtime !== s.mtime ||
+        cur.msg_count !== s.msg_count ||
+        cur.first_prompt !== s.first_prompt ||
+        cur.ai_title !== s.ai_title ||
+        cur.size !== s.size
+      ) {
+        changed.push(s)
+      }
+    }
+    const removed = list.value.some(s => !backend.some(b => b.id === s.id))
+    if (added.length === 0 && !removed && changed.length === 0) return
+
+    // 仅字段变更时原地替换，不重建整个数组，保持滚动位置和选中状态稳定。
+    if (added.length === 0 && !removed) {
+      for (const s of changed) {
+        const idx = list.value.findIndex(x => x.id === s.id)
+        if (idx >= 0) list.value[idx] = s
+      }
+      return
+    }
+
+    const preserved = list.value
+      .filter(s => backend.some(b => b.id === s.id))
+      .map(s => changed.find(b => b.id === s.id) || s)
+    list.value = [...added, ...preserved]
   }
 
   async function create(workdir: string, prompt: string) {
@@ -142,13 +186,16 @@ export const useSessionsStore = defineStore('sessions', () => {
       adopted.value = { ...adopted.value, [id]: true }
       owner.value = { ...owner.value, [id]: 'app' }
       mode.value  = { ...mode.value,  [id]: 'stream' }
+      state.value = { ...state.value, [id]: 'waiting' }
       if (!list.value.find(s => s.id === id)) {
-        list.value = [...list.value, {
+        // 新建会话按 mtime 倒序应排在最前
+        list.value = [{
           id, workdir, mtime: Date.now(), msg_count: 0,
           first_prompt: prompt, ai_title: '', size: 0,
-        }]
+        }, ...list.value]
       }
       activeId.value = id
+      select(id)
       return id
     } finally {
       creating.value = false
@@ -172,7 +219,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         msgId: m.msgId,
         role: m.role || m.Role || 'assistant',
         blocks: parseBlocks(m.content || m.Content),
-        ts: Date.now() - ((raw?.length || 0) - i) * 1000,
+        ts: m.Timestamp || m.timestamp || Date.now(),
       } as ChatMessage))
       if (isFirst) {
         messages.value = { ...messages.value, [sid]: msgs }
@@ -212,7 +259,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         msgId: m.msgId,
         role: m.role || m.Role || 'assistant',
         blocks: parseBlocks(m.content || m.Content),
-        ts: Date.now() - ((raw?.length || 0) - i) * 1000,
+        ts: m.Timestamp || m.timestamp || Date.now(),
       } as ChatMessage))
       historyOffset.value = { ...historyOffset.value, [sid]: offset + (raw?.length || 0) }
       hasMore.value = { ...hasMore.value, [sid]: offset > 0 }

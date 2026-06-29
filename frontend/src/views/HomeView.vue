@@ -1,6 +1,12 @@
 <template>
   <div class="home">
-    <TitleBar @minimize="onMinimize" @maximize="onMaximize" @close="onClose" />
+    <TitleBar
+      :is-maximized="isMaximized"
+      @minimize="onMinimize"
+      @maximize="onMaximize"
+      @restore="onRestore"
+      @close="onClose"
+    />
     <div class="layout">
       <aside class="left">
         <SessionList :list="sessions.list" :active-id="sessions.activeId"
@@ -57,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, nextTick, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import TitleBar from '../components/TitleBar.vue'
 import SessionList from '../components/SessionList.vue'
@@ -68,7 +74,7 @@ import PermissionPanel from '../components/PermissionPanel.vue'
 import Composer from '../components/Composer.vue'
 import NewSessionDialog from '../components/NewSessionDialog.vue'
 import { useSessionsStore } from '../stores/sessions'
-import { WindowMinimise, WindowToggleMaximise, WindowQuit, OpenInTerminal, RespondPermission, SwitchOwner } from '../composables/useWails'
+import { WindowMinimise, WindowToggleMaximise, WindowIsMaximised, ResetAndResizeWindow, WindowQuit, OpenInTerminal, RespondPermission, SwitchOwner, EventsOn } from '../composables/useWails'
 import { useEventStream } from '../composables/useEventStream'
 
 const router = useRouter()
@@ -79,12 +85,30 @@ const showNew = ref(false)
 const username = ref('')
 const version = ref('0.1.0')
 const msgContainer = ref<HTMLElement | null>(null)
+const isMaximized = ref(false)
+
+let maximizePollTimer: number | null = null
 
 onMounted(async () => {
   await sessions.refresh()
   try {
     username.value = await (window as any).go?.app?.App?.OSUsername?.() ?? ''
   } catch {}
+  try {
+    // 从登录小窗口切回主页时，先解除约束再放大，否则会被登录的 minSize 限制
+    await ResetAndResizeWindow(1280, 800, 1024, 680)
+  } catch {}
+  // 轮询同步最大化状态：Wails window 事件名称在不同版本/平台不稳定，
+  // 直接读 WindowIsMaximised 兜底最可靠。
+  const syncMax = async () => {
+    try { isMaximized.value = await WindowIsMaximised() } catch {}
+  }
+  void syncMax()
+  maximizePollTimer = window.setInterval(syncMax, 500)
+})
+
+onBeforeUnmount(() => {
+  if (maximizePollTimer) clearInterval(maximizePollTimer)
 })
 
 const messages = computed(() => sessions.activeId ? sessions.messages[sessions.activeId] ?? [] : [])
@@ -114,8 +138,25 @@ const switchingToApp = computed(() =>
   sessions.activeId ? (sessions.switchingToApp[sessions.activeId] ?? false) : false
 )
 
-// 切换会话或新消息到达时，滚动到底部
-watch(messages, () => { nextTick(() => scrollToBottom()) })
+// 切换会话后需要一次性滚动到底部，让用户看到最新消息。
+const pendingScrollFor = ref<string | null>(null)
+watch(() => sessions.activeId, (id) => {
+  if (id) pendingScrollFor.value = id
+})
+
+// 切换会话或新消息到达时：只在用户已经靠近底部时自动滚动，否则静默更新，
+// 避免用户翻看历史记录时被不断跳回底部。
+watch(displayMessages, () => {
+  nextTick(() => {
+    const sid = sessions.activeId
+    if (sid && pendingScrollFor.value === sid && displayMessages.value.length > 0) {
+      scrollToBottom()
+      pendingScrollFor.value = null
+      return
+    }
+    if (isNearBottom()) scrollToBottom()
+  })
+})
 
 async function onSend(text: string) {
   if (!sessions.activeId) return
@@ -127,6 +168,13 @@ async function onSend(text: string) {
   }
   await nextTick()
   scrollToBottom()
+}
+
+const AUTO_SCROLL_THRESHOLD = 60
+function isNearBottom() {
+  const el = msgContainer.value
+  if (!el) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= AUTO_SCROLL_THRESHOLD
 }
 
 function scrollToBottom() {
@@ -199,7 +247,13 @@ async function respondPermission(allow: boolean) {
 
 function goSettings() { router.push('/settings') }
 function onMinimize()  { WindowMinimise() }
-function onMaximize()  { WindowToggleMaximise() }
+async function onMaximize()  { await toggleMaximize() }
+async function onRestore()   { await toggleMaximize() }
+async function toggleMaximize() {
+  WindowToggleMaximise()
+  await new Promise(r => setTimeout(r, 80))
+  try { isMaximized.value = await WindowIsMaximised() } catch {}
+}
 function onClose()     { WindowQuit() }
 </script>
 

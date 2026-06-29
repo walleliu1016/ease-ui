@@ -19,7 +19,9 @@ export function useEventStream() {
     // 后端 fsnotify 监听 jsonl 变化后推送 → 刷新列表 + 重载当前 session 消息。
     // jsonl 是唯一数据源，不依赖乐观更新，无论 App/Terminal 模式都走这条路径。
     cleanups.push(EventsOn('sessions:list:changed', () => {
-      void sessions.refresh()
+      // jsonl 写入会频繁触发该事件；背景刷新只更新字段、新增插到最前，
+      // 不要按 mtime 重排，否则聊天时左侧列表会不断闪烁/跳动。
+      void sessions.refresh({ sort: false })
       if (sessions.activeId) {
         void sessions.reloadFromJsonl(sessions.activeId)
       }

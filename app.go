@@ -39,6 +39,7 @@ func runApp() error {
 		Height:    800,
 		MinWidth:  1024,
 		MinHeight: 680,
+		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

@@ -275,7 +275,11 @@ wails dev
 # 5) 生产构建（产物在 build/bin/<AppName>.<ext>）
 wails build -clean -trimpath -ldflags "-X main.version=v$(date +%Y%m%d)"
 
-# 6) 跨平台打包（每平台必须在对应 OS 上跑）
+# 6) 仅 Go 后端快速验证
+# Go 1.26.3 + Wails v2.12.0 在当前环境生成 bindings 会失败，推荐用 --skipbindings
+wails build -s --skipbindings
+
+# 7) 跨平台打包（每平台必须在对应 OS 上跑）
 wails build -platform darwin/universal     # macOS
 wails build -platform windows/amd64        # Windows / mingw-w64
 wails build -platform linux/amd64          # Linux / Docker

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -88,6 +89,13 @@ func ScanAll() ([]SessionMeta, error) {
 			})
 		}
 	}
+	// 最近活跃的会话排在最前，便于用户找到当前关心的会话；ID 作为稳定次排序。
+	sort.Slice(metas, func(i, j int) bool {
+		if metas[i].MTime != metas[j].MTime {
+			return metas[i].MTime > metas[j].MTime
+		}
+		return metas[i].ID < metas[j].ID
+	})
 	return metas, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,6 +60,25 @@ func TestScanAll_EmptyDirReturnsEmpty(t *testing.T) {
 	metas, err := ScanAll()
 	require.NoError(t, err)
 	assert.Empty(t, metas)
+}
+
+func TestScanAll_SortsByMTimeDescending(t *testing.T) {
+	root := t.TempDir()
+	projDir := filepath.Join(root, "projects", "proj1")
+	require.NoError(t, os.MkdirAll(projDir, 0o755))
+
+	pathOld := filepath.Join(projDir, "old.jsonl")
+	pathNew := filepath.Join(projDir, "new.jsonl")
+	mustWrite(t, pathOld, `{"type":"user","message":{"role":"user","content":"old"}}`)
+	require.NoError(t, os.Chtimes(pathOld, time.Now(), time.Now().Add(-time.Hour)))
+	mustWrite(t, pathNew, `{"type":"user","message":{"role":"user","content":"new"}}`)
+
+	SetRoot(filepath.Join(root, "projects"))
+	metas, err := ScanAll()
+	require.NoError(t, err)
+	require.Len(t, metas, 2)
+	assert.Equal(t, "new", metas[0].ID)
+	assert.Equal(t, "old", metas[1].ID)
 }
 
 func mustWrite(t *testing.T, path, content string) {

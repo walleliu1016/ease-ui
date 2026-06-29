@@ -4,7 +4,13 @@
     <div class="login-body">
       <div class="login-head">
         <div class="login-logo">E</div>
-        <div class="login-title">登录 Ease</div>
+        <div class="login-title-row">
+          <span class="login-title">登录 Ease</span>
+          <button class="settings-btn" title="设置" @click="goSettings">
+            <span class="settings-icon">⚙</span>
+            <span class="settings-label">设置</span>
+          </button>
+        </div>
       </div>
 
       <form @submit.prevent="onSubmit" class="form">
@@ -45,6 +51,7 @@
         <div class="login-footer">Ease v{{ version }}</div>
       </form>
     </div>
+    <SettingsDialog v-if="showSettings" @close="closeSettings" />
   </div>
 </template>
 
@@ -52,8 +59,9 @@
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import TitleBar from '../components/TitleBar.vue'
+import SettingsDialog from '../components/SettingsDialog.vue'
 import { useAuthStore } from '../stores/auth'
-import { WindowMinimise, WindowToggleMaximise, WindowQuit } from '../composables/useWails'
+import { WindowMinimise, WindowToggleMaximise, WindowQuit, ResetAndResizeWindow } from '../composables/useWails'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -63,6 +71,7 @@ const password = ref('')
 const error = ref<string | null>(null)
 const errorField = ref<'username' | 'password' | null>(null)
 const version = ref('0.1.0')
+const showSettings = ref(false)
 
 const locked = computed(() => !!auth.lockedUntil)
 const lockCountdown = computed(() => {
@@ -82,6 +91,9 @@ onMounted(async () => {
   try {
     const u = await (window as any).go?.app?.App?.OSUsername?.()
     if (u) username.value = u
+  } catch {}
+  try {
+    await ResetAndResizeWindow(320, 400, 320, 400)
   } catch {}
 
   timer = window.setInterval(() => {
@@ -119,6 +131,16 @@ async function onSubmit() {
 function onMinimize() { WindowMinimise() }
 function onMaximize() { WindowToggleMaximise() }
 function onClose()    { WindowQuit() }
+async function goSettings() {
+  showSettings.value = true
+  // 弹窗需要更大空间，临时放大窗口
+  try { await ResetAndResizeWindow(700, 520, 700, 520) } catch {}
+}
+async function closeSettings() {
+  showSettings.value = false
+  // 关闭弹窗后恢复登录小窗口
+  try { await ResetAndResizeWindow(320, 400, 320, 400) } catch {}
+}
 </script>
 
 <style scoped>
@@ -126,44 +148,54 @@ function onClose()    { WindowQuit() }
 .login-body {
   flex: 1;
   background: radial-gradient(ellipse at top, var(--bg-input) 0%, var(--bg-primary) 70%);
-  padding: 28px 32px 22px;
+  padding: 18px 22px 14px;
   display: flex; flex-direction: column;
 }
-.login-head { display: flex; flex-direction: column; align-items: center; margin-bottom: 18px; }
+.login-head { display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; }
 .login-logo {
-  width: 36px; height: 36px; border-radius: 9px;
+  width: 28px; height: 28px; border-radius: 7px;
   background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 16px; font-weight: 700;
+  color: white; font-size: 13px; font-weight: 700;
   box-shadow: var(--shadow-accent);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
-.login-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.login-title-row { display: flex; align-items: center; gap: 8px; }
+.login-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.settings-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: var(--radius-md);
+  color: var(--text-secondary); font-size: 10px; font-weight: 500;
+  background: var(--bg-input); border: 1px solid var(--border);
+  cursor: pointer;
+}
+.settings-btn:hover { color: var(--text-primary); background: var(--bg-panel); border-color: var(--accent); }
+.settings-icon { font-size: 11px; }
 .form { flex: 1; display: flex; flex-direction: column; }
-.form-group { margin-bottom: 10px; }
+.form-group { margin-bottom: 6px; }
 .form-label {
   display: block; font-size: 9px; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: 0.8px;
-  margin-bottom: 4px; font-weight: 600;
+  margin-bottom: 3px; font-weight: 600;
 }
 .form-input {
   width: 100%;
   background: var(--bg-input); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 8px 11px;
+  border-radius: var(--radius-md); padding: 7px 10px;
   color: var(--text-primary); font-size: 12px;
 }
 .form-input.error { border-color: var(--status-error); }
 .form-input:focus { outline: none; border-color: var(--accent); }
 .form-input:disabled { opacity: 0.5; cursor: not-allowed; }
-.form-hint { font-size: 10px; color: var(--status-error); margin-top: 4px; min-height: 14px; }
+.form-hint { font-size: 10px; color: var(--status-error); margin-top: 3px; min-height: 14px; }
 .login-btn {
   width: 100%;
   background: linear-gradient(135deg, var(--accent), #6D28D9);
-  color: white; padding: 8px; border-radius: var(--radius-md);
+  color: white; padding: 7px; border-radius: var(--radius-md);
   font-size: 12px; font-weight: 500;
   box-shadow: var(--shadow-accent);
   margin-top: 4px;
 }
 .login-btn:disabled { opacity: 0.4; box-shadow: none; }
-.login-footer { font-size: 9px; color: var(--text-tertiary); text-align: center; margin-top: 12px; }
+.login-footer { font-size: 9px; color: var(--text-tertiary); text-align: center; margin-top: 10px; }
 </style>
