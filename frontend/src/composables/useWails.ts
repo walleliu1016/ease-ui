@@ -17,21 +17,20 @@ declare global {
           ListSessions: () => Promise<any[]>
           CreateSession: (workdir: string, prompt: string) => Promise<string>
           SendMessage: (id: string, prompt: string) => Promise<void>
-          RespondHookPermission: (reqId: string, decision: any) => Promise<void>
           CloseSession: (id: string) => Promise<void>
           GetSettings: () => Promise<any>
           UpdateSettings: (cfg: any) => Promise<void>
           GetHooksConfig: () => Promise<any>
           SaveHooksConfig: (cfg: any) => Promise<void>
-          OpenInTerminal: (workdir: string, sessionId: string, binPath: string) => Promise<void>
           GetSessionMessages: (id: string, workdir: string, offset: number, limit: number) => Promise<Array<{Role: string; Content: string; Type: string; Timestamp: number}>>
           GetToolExecutions: (id: string, workdir: string) => Promise<Array<{ id: string; kind: string; name: string; startedAt: number; endedAt: number; durationMs: number; status: string; input: string; output: string; exitCode: number }>>
           PickDirectory: () => Promise<string>
           GetHookServerPort: () => Promise<number>
           CheckAndFixHooks: () => Promise<boolean>
           GetSessionStates: () => Promise<Record<string, string>>
-          SwitchOwner: (id: string, target: string, prompt: string) => Promise<void>
           AdoptSession: (id: string, workDir: string) => Promise<void>
+          WriteTerminalInput: (id: string, data: string) => Promise<void>
+          ResizeTerminal: (id: string, cols: number, rows: number) => Promise<void>
           GetProvidersConfig: () => Promise<import('../types/providers').ProvidersConfig>
           SaveProvidersConfig: (cfg: import('../types/providers').ProvidersConfig) => Promise<void>
           ApplyActiveProvider: () => Promise<void>
@@ -112,21 +111,20 @@ export const ClearPassword    = () => app().ClearPassword()
 export const ListSessions     = () => app().ListSessions()
 export const CreateSession    = (workdir: string, prompt: string) => app().CreateSession(workdir, prompt)
 export const SendMessage      = (id: string, prompt: string) => app().SendMessage(id, prompt)
-export const RespondHookPermission = (reqId: string, decision: any) => app().RespondHookPermission(reqId, decision)
 export const CloseSession     = (id: string) => app().CloseSession(id)
 export const GetSettings      = () => app().GetSettings()
 export const UpdateSettings   = (cfg: any) => app().UpdateSettings(cfg)
 export const GetHooksConfig   = () => app().GetHooksConfig()
 export const SaveHooksConfig  = (cfg: any) => app().SaveHooksConfig(cfg)
-export const OpenInTerminal   = (workdir: string, sessionId: string, binPath: string) => app().OpenInTerminal(workdir, sessionId, binPath)
 export const GetSessionMessages = (id: string, workdir: string, offset: number, limit: number) => app().GetSessionMessages(id, workdir, offset, limit)
 export const GetToolExecutions  = (id: string, workdir: string) => app().GetToolExecutions(id, workdir)
 export const PickDirectory      = () => app().PickDirectory()
 export const GetHookServerPort  = () => app().GetHookServerPort()
 export const CheckAndFixHooks   = () => app().CheckAndFixHooks()
 export const GetSessionStates  = () => app().GetSessionStates()
-export const SwitchOwner       = (id: string, target: string, prompt: string) => app().SwitchOwner(id, target, prompt)
 export const AdoptSession      = (id: string, workDir: string) => app().AdoptSession(id, workDir)
+export const WriteTerminalInput = (id: string, data: string) => app().WriteTerminalInput(id, data)
+export const ResizeTerminal     = (id: string, cols: number, rows: number) => app().ResizeTerminal(id, cols, rows)
 export const GetProvidersConfig = () => app().GetProvidersConfig()
 export const SaveProvidersConfig = (cfg: import('../types/providers').ProvidersConfig) => app().SaveProvidersConfig(cfg)
 export const ApplyActiveProvider = () => app().ApplyActiveProvider()
