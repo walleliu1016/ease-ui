@@ -4,6 +4,7 @@ package pty
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
 
@@ -24,9 +25,9 @@ func startTTY(cmd *exec.Cmd) (TTY, error) {
 
 	// 将命令附加到 PTY
 	c := tty.Command(cmd.Path)
-	c.Args = append([]string{cmd.Path}, cmd.Args...)
+	c.Args = cmd.Args
 	c.Dir = cmd.Dir
-	c.Env = append(cmd.Env, "TERM=xterm-256color")
+	c.Env = append(os.Environ(), "TERM=xterm-256color")
 
 	// 隐藏 Windows 控制台窗口
 	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
