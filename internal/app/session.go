@@ -168,7 +168,7 @@ func (a *App) AdoptSession(sessionID, workDir string) error {
 		fmt.Fprintf(os.Stderr, "[DBG] AdoptSession: sid=%s found but proc=nil, re-spawning\n", sessionID)
 	}
 	if sessionID == "" || workDir == "" {
-		return &appError{code: "E_BAD_ARG", msg: "AdoptSession: sessionID and workDir required"}
+		return &appError{msg: "AdoptSession: sessionID and workDir required"}
 	}
 	// 懒策略：只创建 session + 注册到 a.sessions，不启动进程。
 	// 进程在 SendMessage 时延迟启动，确保 claude 一起来就能收到输入。
@@ -325,11 +325,10 @@ func (a *App) ResizeTerminal(sessionID string, cols, rows int) error {
 	return nil
 }
 
-// newID 生成标准 UUID v4 格式的 session ID（Claude CLI 要求 UUID 格式）。
-var errSessionNotFound = &appError{code: "E_SESSION_NOT_FOUND", msg: "session not found"}
+var errSessionNotFound = &appError{msg: "session not found"}
 
 type appError struct {
-	code, msg string
+	msg string
 }
 
 func (e *appError) Error() string { return e.msg }

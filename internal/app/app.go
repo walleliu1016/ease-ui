@@ -9,7 +9,6 @@ import (
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/akke/ease-ui/internal/auth"
-	"github.com/akke/ease-ui/internal/events"
 	"github.com/akke/ease-ui/internal/hooks"
 	"github.com/akke/ease-ui/internal/hookserver"
 	"github.com/akke/ease-ui/internal/instance"
@@ -33,7 +32,6 @@ type App struct {
 	handler   *hooks.Handler
 	appMu     sync.RWMutex
 	sessions  map[string]*session.Session
-	bus       *events.Bus
 	claudeBin string
 	ctx       context.Context
 	hookSrv   *hookserver.Server
@@ -97,7 +95,6 @@ func New(opts Options) (*App, error) {
 		auth:     a,
 		settings: cfg,
 		handler:  hooks.NewHandler(cfg.AutoAllowBash),
-		bus:      events.NewBus(),
 		sessions: map[string]*session.Session{},
 		inst:     inst,
 		permPending: map[string]*permWaiter{},
